@@ -1,0 +1,75 @@
+name: print3d-manager-erp
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: print3d-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-print3d_manager}
+      POSTGRES_USER: ${POSTGRES_USER:-print3d}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-print3d}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-print3d} -d ${POSTGRES_DB:-print3d_manager}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - print3d-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: print3d-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-print3d_manager}
+      DATABASE_USERNAME: ${POSTGRES_USER:-print3d}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-print3d}
+      JWT_SECRET: ${JWT_SECRET:-cHJpbnQzZC1tYW5hZ2VyLWVycC1kZXYtc2VjcmV0LWtleS0yNTYtYml0cy1taW5pbXVtLXNpemU=}
+      JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-900000}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
+      UPLOAD_DIR: /app/uploads
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend-uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - print3d-network
+
+  # ------------------------------------------------------------------
+  # O serviço do frontend será habilitado na Etapa 17 (Frontend React),
+  # quando o projeto Vite existir. O Dockerfile e o nginx.conf já estão
+  # prontos em ./frontend.
+  # ------------------------------------------------------------------
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: print3d-frontend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "80:80"
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - print3d-network
+
+volumes:
+  postgres-data:
+  backend-uploads:
+
+networks:
+  print3d-network:
+    driver: bridge

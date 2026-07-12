@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/print3d_manager}
+    username: ${DATABASE_USERNAME:print3d}
+    password: ${DATABASE_PASSWORD:print3d}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    com.print3dmanager.erp: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.springframework.security: DEBUG

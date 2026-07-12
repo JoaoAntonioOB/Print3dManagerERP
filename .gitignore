@@ -1,0 +1,41 @@
+# ===== Java / Maven =====
+backend/target/
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+replay_pid*
+
+# ===== Node / Frontend =====
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
+
+# ===== IDEs =====
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+*.swo
+
+# ===== SO =====
+.DS_Store
+Thumbs.db
+
+# ===== Ambiente / Segredos =====
+.env
+.env.local
+.env.*.local
+
+# ===== Uploads e dados locais =====
+uploads/
+backend/uploads/
+docker/postgres-data/
+
+# ===== Logs =====
+*.log
+logs/
