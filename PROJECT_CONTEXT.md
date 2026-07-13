@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 3).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 4).
 
 ---
 
@@ -92,8 +92,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 1 | Estrutura do projeto | ✅ Concluída |
 | 2 | Docker | ✅ Concluída (testada — containers sobem, Postgres healthy) |
 | 3 | Flyway | ✅ Concluída (V1–V9 aplicadas e validadas no Postgres do Docker) |
-| 4 | Banco de dados (entidades JPA + BaseEntity) | ⬜ **PRÓXIMA** |
-| 5 | Spring Security | ⬜ |
+| 4 | Banco de dados (entidades JPA + BaseEntity) | ✅ Concluída (boot validado com `ddl-auto: validate`) |
+| 5 | Spring Security | ⬜ **PRÓXIMA** |
 | 6 | JWT | ⬜ |
 | 7 | Usuários | ⬜ |
 | 8 | Clientes | ⬜ |
@@ -149,6 +149,15 @@ Print3d Manager ERP/
 - `itens_pedido` deleta em cascata com o pedido; `historico_impressoes.item_pedido_id` usa `ON DELETE SET NULL`.
 - Estoque de filamento fica em `filamentos` (gramas); `itens_estoque` é só para insumos gerais.
 
+### Entidades JPA (Etapa 4 — decisões)
+- **Classes em inglês, campos em português** casando com as colunas — a naming strategy padrão do Spring (camelCase → snake_case) elimina quase todos os `@Column(name=...)`; explícitos só onde a conversão falharia (ex.: `volumeXMm` → `volume_x_mm`) e nos `@JoinColumn`.
+- `common/model/BaseEntity`: `@MappedSuperclass` com `id` (IDENTITY), `criadoEm`/`atualizadoEm` (`Instant` + `@CreationTimestamp`/`@UpdateTimestamp`), `equals`/`hashCode` por id.
+- Todos os relacionamentos `LAZY`; `Order` tem `@OneToMany` bidirecional com `OrderItem` (cascade ALL + orphanRemoval, helpers `adicionarItem`/`removerItem`).
+- `Address` é `@Embeddable` em `client/model/` (colunas achatadas em `clientes`); `estado` usa `@JdbcTypeCode(Types.CHAR)` para validar contra `CHAR(2)`.
+- Enums Java espelham os CHECKs: `Role`, `PersonType`, `PrinterStatus`, `FilamentMaterial`, `OrderStatus`, `QuoteStatus`, `PrintStatus`, `TransactionType`, `TransactionStatus` — sempre `@Enumerated(STRING)`.
+- `Quote.shareToken` inicializado com `UUID.randomUUID()` na aplicação (o default do banco é fallback); campos monetários `BigDecimal` com defaults `ZERO` onde o banco tem `DEFAULT 0`.
+- `PrintHistory` e `PrintStatus` ficam no módulo `order` (junto de pedidos/itens, conforme arquitetura).
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -174,5 +183,5 @@ Print3d Manager ERP/
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 4 — Banco de dados**: `BaseEntity` em `common/`, entidades JPA de todos os módulos mapeando o schema das migrações V1–V9, enums Java correspondentes aos CHECKs; validar com boot da aplicação — `ddl-auto: validate` acusa qualquer divergência).
+3. Implementar a próxima etapa pendente (**Etapa 5 — Spring Security**: `SecurityConfig` em `security/` com SecurityFilterChain stateless, liberação de Swagger/actuator/rotas públicas, `PasswordEncoder` BCrypt, `UserDetailsService` sobre a entidade `User`, tratamento de 401/403 em JSON; o JWT em si é a Etapa 6).
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
