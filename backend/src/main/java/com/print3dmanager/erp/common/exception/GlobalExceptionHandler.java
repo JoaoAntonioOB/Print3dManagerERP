@@ -4,6 +4,7 @@ import com.print3dmanager.erp.common.dto.ApiErrorResponse;
 import com.print3dmanager.erp.common.dto.ApiErrorResponse.FieldValidationError;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -86,6 +87,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleRotaInexistente(NoResourceFoundException ex,
                                                                   HttpServletRequest request) {
         return construir(HttpStatus.NOT_FOUND, "Recurso não encontrado.", request, null);
+    }
+
+    @ExceptionHandler(ResourceConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleConflito(ResourceConflictException ex,
+                                                           HttpServletRequest request) {
+        return construir(HttpStatus.CONFLICT, ex.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ApiErrorResponse> handleOrdenacaoInvalida(PropertyReferenceException ex,
+                                                                    HttpServletRequest request) {
+        return construir(HttpStatus.BAD_REQUEST,
+                "Parâmetro de ordenação ou filtro inválido: " + ex.getPropertyName(),
+                request, null);
     }
 
     @ExceptionHandler(BusinessException.class)

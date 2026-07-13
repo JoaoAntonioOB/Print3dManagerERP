@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 6).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 7).
 
 ---
 
@@ -95,8 +95,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 4 | Banco de dados (entidades JPA + BaseEntity) | ✅ Concluída (boot validado com `ddl-auto: validate`) |
 | 5 | Spring Security | ✅ Concluída (401/403 JSON validados via HTTP real) |
 | 6 | JWT | ✅ Concluída (login/refresh/logout testados via HTTP real) |
-| 7 | Usuários | ⬜ **PRÓXIMA** |
-| 8 | Clientes | ⬜ |
+| 7 | Usuários | ✅ Concluída (18 cenários E2E via HTTP real) |
+| 8 | Clientes | ⬜ **PRÓXIMA** |
 | 9 | Impressoras | ⬜ |
 | 10 | Filamentos | ⬜ |
 | 11 | Estoque | ⬜ |
@@ -174,6 +174,15 @@ Print3d Manager ERP/
 - `config/OpenApiConfig`: título/descrição da API + esquema `bearerAuth` global (botão Authorize no Swagger); `/auth/**` anotado com `@SecurityRequirements` (sem cadeado).
 - **Migração V11**: usuário admin inicial `admin@print3d.com` / `admin123` (BCrypt custo 10) — **trocar senha em produção**.
 
+### Módulo Usuários (Etapa 7 — PADRÃO PARA OS DEMAIS CRUDs)
+O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
+- **Estrutura**: `controller/` + `service/` + `repository/` (com classe `*Specifications`) + `dto/` (records com Bean Validation e `@Schema`) + `mapper/` (MapStruct: `toResponse`, `toEntity`, `atualizar(@MappingTarget ...)` — senha/campos sensíveis ignorados no mapper e tratados no service).
+- **Listagem**: `PageResponse<T>` (`common/dto/`, envelope estável: content/page/size/totalElements/totalPages/first/last) + `JpaSpecificationExecutor` com filtros opcionais (parâmetro nulo = ignorado) + `@ParameterObject @PageableDefault(sort=...) Pageable`.
+- **Conflitos**: `ResourceConflictException` → 409 (e-mail duplicado etc.); sort inválido (`PropertyReferenceException`) → 400; ambos no handler global.
+- **Autorização**: `@PreAuthorize("hasRole('ADMINISTRADOR')")` método a método (explícito, sem herança de classe); endpoints `/users/me` e `/users/me/senha` para qualquer autenticado via `@AuthenticationPrincipal SecurityUser`.
+- **Regras**: soft delete (`DELETE` → `ativo=false` + revoga refresh tokens; login passa a dar 401 na hora); não pode desativar a si mesmo (400); `PATCH /{id}/ativar` reativa; troca de senha exige senha atual e revoga todas as sessões do usuário.
+- Endpoints: `GET /users` (busca nome/e-mail, role, ativo, paginado), `GET/PUT/DELETE /users/{id}`, `POST /users`, `PATCH /users/{id}/ativar`, `GET /users/me`, `PATCH /users/me/senha`.
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -199,5 +208,5 @@ Print3d Manager ERP/
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 7 — Usuários**: CRUD completo em `user/` — controller/service/dto/mapper —, primeiro uso de MapStruct e do padrão de paginação/filtros, `@PreAuthorize` por role (gestão restrita a ADMINISTRADOR), troca de senha, soft delete via `ativo`, e endpoint `/users/me` para o usuário logado).
+3. Implementar a próxima etapa pendente (**Etapa 8 — Clientes**: CRUD em `client/` seguindo o padrão do módulo Usuários — MapStruct com `Address` embeddable, filtros por busca/tipoPessoa/ativo, validação de CPF/CNPJ único → 409, soft delete; acesso: ADMINISTRADOR e OPERADOR gerenciam, demais roles autenticadas podem consultar).
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
