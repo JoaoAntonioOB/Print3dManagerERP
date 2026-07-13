@@ -100,7 +100,7 @@ npm run dev
 3. ✅ Flyway
 4. ✅ Banco de dados
 5. ✅ Spring Security
-6. ⬜ JWT
+6. ✅ JWT
 7. ⬜ Usuários
 8. ⬜ Clientes
 9. ⬜ Impressoras

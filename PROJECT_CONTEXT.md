@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 5).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 6).
 
 ---
 
@@ -94,8 +94,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 3 | Flyway | ✅ Concluída (V1–V9 aplicadas e validadas no Postgres do Docker) |
 | 4 | Banco de dados (entidades JPA + BaseEntity) | ✅ Concluída (boot validado com `ddl-auto: validate`) |
 | 5 | Spring Security | ✅ Concluída (401/403 JSON validados via HTTP real) |
-| 6 | JWT | ⬜ **PRÓXIMA** |
-| 7 | Usuários | ⬜ |
+| 6 | JWT | ✅ Concluída (login/refresh/logout testados via HTTP real) |
+| 7 | Usuários | ⬜ **PRÓXIMA** |
 | 8 | Clientes | ⬜ |
 | 9 | Impressoras | ⬜ |
 | 10 | Filamentos | ⬜ |
@@ -166,6 +166,14 @@ Print3d Manager ERP/
 - `PasswordEncoder` BCrypt e `AuthenticationManager` (via `AuthenticationConfiguration`) já expostos como beans para o login JWT da Etapa 6.
 - CORS centralizado em `CorsConfigurationSource` lendo `config/CorsProperties` (`application.cors.allowed-origins`), com `allowCredentials` e header `Content-Disposition` exposto (downloads de relatórios).
 
+### JWT (Etapa 6 — decisões)
+- **Access token JWT** (jjwt 0.12.5, HMAC — chave Base64 de `application.security.jwt.secret` via `config/JwtProperties`): subject = e-mail, claims `uid` e `role`, 15 min. **Refresh token opaco** (UUID) persistido em `refresh_tokens` (migração V10), 7 dias, **com rotação**: cada uso revoga o token e emite novo par; reuso → 401. Multissessão permitida.
+- `security/jwt/JwtAuthenticationFilter` (antes do `UsernamePasswordAuthenticationFilter`): token inválido apenas segue sem autenticação (401 vem da autorização); usuário é **recarregado do banco** a cada requisição (desativação tem efeito imediato).
+- `security/auth/`: `AuthController` (`POST /auth/login|refresh|logout`), `AuthService`, entidade `RefreshToken`, repository e DTOs record com Bean Validation. Resposta de login: campos de token em convenção OAuth (`accessToken`, `refreshToken`, `tokenType`, `expiresIn` em segundos) + objeto `usuario` em pt-BR.
+- **Tratamento global de exceções** criado em `common/exception/`: `GlobalExceptionHandler` (@RestControllerAdvice) cobre validação (400 com lista `errors` por campo), credenciais/token inválidos (401 — mensagem genérica no login para não revelar e-mails existentes), 403, 404 (`ResourceNotFoundException` + rota inexistente), `BusinessException` (400) e 500 genérico com log. `ApiErrorResponse` ganhou campo opcional `errors`.
+- `config/OpenApiConfig`: título/descrição da API + esquema `bearerAuth` global (botão Authorize no Swagger); `/auth/**` anotado com `@SecurityRequirements` (sem cadeado).
+- **Migração V11**: usuário admin inicial `admin@print3d.com` / `admin123` (BCrypt custo 10) — **trocar senha em produção**.
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -191,5 +199,5 @@ Print3d Manager ERP/
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 6 — JWT**: `JwtService` com jjwt 0.12.5 lendo `application.security.jwt.*` via propriedades tipadas, filtro `OncePerRequestFilter` antes do `UsernamePasswordAuthenticationFilter`, endpoints `/auth/login` e `/auth/refresh` com refresh token persistido — precisa de migração V10 para a tabela de refresh tokens —, DTOs record + Swagger, e `OpenApiConfig` com esquema bearer).
+3. Implementar a próxima etapa pendente (**Etapa 7 — Usuários**: CRUD completo em `user/` — controller/service/dto/mapper —, primeiro uso de MapStruct e do padrão de paginação/filtros, `@PreAuthorize` por role (gestão restrita a ADMINISTRADOR), troca de senha, soft delete via `ativo`, e endpoint `/users/me` para o usuário logado).
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.

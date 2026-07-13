@@ -1,6 +1,7 @@
 package com.print3dmanager.erp.security;
 
 import com.print3dmanager.erp.config.CorsProperties;
+import com.print3dmanager.erp.security.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +17,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -25,8 +27,8 @@ import java.util.List;
 /**
  * Configuração central de segurança.
  *
- * API stateless (sem sessão/CSRF): a autenticação será feita por JWT
- * (filtro adicionado na Etapa 6). Rotas públicas: autenticação,
+ * API stateless (sem sessão/CSRF): a autenticação é feita pelo
+ * JwtAuthenticationFilter. Rotas públicas: autenticação,
  * aprovação pública de orçamentos, Swagger e health/info do Actuator.
  * Os caminhos abaixo não incluem o context path /api.
  */
@@ -55,6 +57,7 @@ public class SecurityConfig {
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
     private final CorsProperties corsProperties;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -75,6 +78,7 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
