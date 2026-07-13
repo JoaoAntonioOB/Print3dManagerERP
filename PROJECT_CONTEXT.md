@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-13** (fim da Etapa 13).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-13** (fim da Etapa 14).
 
 ---
 
@@ -102,8 +102,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 11 | Estoque | ✅ Concluída (21 cenários E2E via HTTP real) |
 | 12 | Pedidos | ✅ Concluída (34 cenários E2E via HTTP real; upload de STL adiado) |
 | 13 | Orçamentos | ✅ Concluída (30 cenários E2E via HTTP real) |
-| 14 | Dashboard (gráficos + indicadores) | ⬜ **PRÓXIMA** |
-| 15 | Financeiro | ⬜ |
+| 14 | Dashboard (gráficos + indicadores) | ✅ Concluída (17 cenários E2E via HTTP real) |
+| 15 | Financeiro | ⬜ **PRÓXIMA** |
 | 16 | Relatórios (PDF) | ⬜ |
 | 17 | Frontend React | ⬜ |
 | 18 | Testes (JUnit, Mockito, integração) | ⬜ |
@@ -223,6 +223,12 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - **Link público** (`/public/quotes/{shareToken}`, sem login): `GET` (visão do cliente — `PublicQuoteResponse` SEM custos internos/markup/preço sugerido, só o preço efetivo), `POST .../aprovar|recusar` (exigem ENVIADO). RASCUNHO → 404; token inválido → 404 (parse de UUID no service). **Expiração preguiçosa**: ENVIADO com `dataValidade` vencida vira EXPIRADO em qualquer acesso público (métodos públicos são `@Transactional` de escrita por isso).
 - **Conversão em pedido**: exige APROVADO; monta `OrderCreateRequest` (item único: nomePeca = descrição truncada em 160 ou "Orçamento NUM", preço unitário = `precoEfetivo`, peso/tempo/filamento do orçamento) e **reusa `OrderService.criar`** (número PED, validações); vincula `pedido_id`, marca CONVERTIDO e retorna o `OrderResponse` (201).
 
+### Módulo Dashboard (Etapa 14)
+- Somente leitura, acessível a todos os perfis internos (`PODE_CONSULTAR`); **parâmetros fora da faixa são ajustados** (`Math.clamp`), não rejeitados. Sem entidade/migração nova.
+- `DashboardQueryRepository` (`@Repository` com `EntityManager`, SQL nativo): concentra as agregações para o módulo ficar autocontido em vez de espalhar `@Query` pelos repositories dos outros módulos. Meses agrupados com `to_char(..., 'YYYY-MM')` em UTC.
+- **Endpoints**: `GET /dashboard/resumo` (pedidos/orçamentos/impressoras por status — **todas as chaves do enum presentes, ausência = 0** —, filamentos e itens com estoque baixo, clientes ativos, impressões em andamento, pedidos e faturamento do mês corrente); `vendas-mensais?meses=` (pedidos abertos por `criado_em` + faturamento ENTREGUE por `data_entrega_realizada`); `consumo-filamento?meses=` (Σ `peso_utilizado_g` por mês de `finalizado_em`); `taxa-sucesso` (CONCLUIDA ÷ (CONCLUIDA+FALHOU) %, null sem finalizadas); `top-clientes?limite=` (Σ `valor_total` sem CANCELADOs, ordem decrescente).
+- **Séries mensais sempre devolvem os N meses completos** (janela 1–60 incluindo o corrente, faltantes zerados, ordem cronológica) — prontas para os gráficos Recharts da Etapa 17 sem tratamento no frontend.
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -248,5 +254,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 14 — Dashboard**: módulo `dashboard/` com endpoints somente-leitura de indicadores agregados para o frontend (Recharts na Etapa 17). Escopo sugerido: `GET /dashboard/resumo` (contadores: pedidos por status, orçamentos por status, impressoras por status, filamentos com estoque baixo, itens de estoque baixos, clientes ativos) + séries para gráficos (ex.: pedidos e faturamento por mês — `valor_total` de pedidos ENTREGUEs; consumo de filamento por mês a partir de `historico_impressoes.peso_utilizado_g`; taxa de sucesso de impressões CONCLUIDA×FALHOU; top clientes). Usar queries de agregação (JPQL/`@Query` ou projeções) — sem entidade nova nem migração. Todos os perfis autenticados podem consultar (inclusive FINANCEIRO/VISUALIZADOR). Definir recorte exato com o usuário se houver dúvida. Upload de STL/3MF continua adiado.)
+3. Implementar a próxima etapa pendente (**Etapa 15 — Financeiro**: módulo `financial/` (`FinancialTransaction`, tabela `transacoes_financeiras` da V9 — conferir colunas/CHECKs na migração antes de codar: tipo RECEITA/DESPESA, status, categoria, pedido vinculado etc.). Escopo sugerido: CRUD em `/financial/transactions` no padrão dos módulos (filtros: busca descrição, `tipo`, `status`, `categoria`, `pedidoId`, período); regras de status (ex.: PENDENTE→PAGA/CANCELADA — ver CHECK da V9); **integração com pedidos**: gerar receita PENDENTE automaticamente quando o pedido é ENTREGUE (ou endpoint de faturamento manual `POST /orders/{id}/faturar` — decidir com o usuário); resumo financeiro `GET /financial/resumo` (receitas × despesas × saldo por período/mês, complementando o dashboard). Perfis: ADMINISTRADOR e FINANCEIRO gerenciam; OPERADOR/VISUALIZADOR consultam? — confirmar com o usuário, pois difere do padrão dos demais módulos. Upload de STL/3MF continua adiado.)
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
