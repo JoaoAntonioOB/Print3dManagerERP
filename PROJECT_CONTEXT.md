@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 9).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-13** (fim da Etapa 10).
 
 ---
 
@@ -98,8 +98,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 7 | Usuários | ✅ Concluída (18 cenários E2E via HTTP real) |
 | 8 | Clientes | ✅ Concluída (13 cenários E2E via HTTP real) |
 | 9 | Impressoras | ✅ Concluída (15 cenários E2E via HTTP real) |
-| 10 | Filamentos | ⬜ **PRÓXIMA** |
-| 11 | Estoque | ⬜ |
+| 10 | Filamentos | ✅ Concluída (20 cenários E2E via HTTP real) |
+| 11 | Estoque | ⬜ **PRÓXIMA** |
 | 12 | Pedidos | ⬜ |
 | 13 | Orçamentos | ⬜ |
 | 14 | Dashboard (gráficos + indicadores) | ⬜ |
@@ -193,6 +193,13 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - CRUD padrão em `/printers` (filtros: busca nome/marca/modelo, status, ativo). `PATCH /{id}/status` muda a situação operacional (recusa em impressora desativada → 400); soft delete marca INATIVA, reativação volta DISPONIVEL.
 - **Configurações de custo** (`PrinterConfigurationController`, escrita **só ADMINISTRADOR**): `GET|PUT /printers/config` (global, upsert) e `GET|PUT|DELETE /printers/{id}/config` (própria, upsert). O `GET /{id}/config` retorna a **configuração efetiva** — própria se existir, senão global — com campo `origem` (`PROPRIA`/`GLOBAL`); sem global cadastrada → 404 com mensagem orientando o PUT. **A Etapa 13 (Orçamentos) deve usar `PrinterConfigurationService.buscarEfetiva`** como fonte dos parâmetros de custo.
 
+### Módulo Filamentos (Etapa 10)
+- CRUD padrão em `/filaments` (filtros: busca nome/marca/cor, `material`, `ativo`, `estoqueBaixo`). Mesmos níveis de acesso das impressoras (`PODE_GERENCIAR` / `PODE_CONSULTAR`).
+- `FilamentResponse` traz o campo calculado **`estoqueBaixo`** (`quantidade ≤ estoque mínimo`) — método `Filament.isEstoqueBaixo()` na entidade, mapeado automaticamente pelo MapStruct; o filtro `estoqueBaixo` da listagem compara as duas colunas na Specification.
+- **Estoque só muda por `PATCH /filaments/{id}/estoque`** (`{tipo: ENTRADA|SAIDA, quantidadeG}` — enum `StockMovementType`): saída maior que o saldo → 400; movimentação em filamento desativado → 400. O PUT **não** toca em `quantidadeEstoqueG` (campo ausente do `FilamentUpdateRequest`).
+- Defaults do cadastro via MapStruct `defaultValue` no `toEntity` (diâmetro `1.75`, estoques `0`) — campos omitidos no POST assumem os mesmos defaults do banco.
+- **A Etapa 12 (Pedidos) fará o consumo automático de estoque** ao registrar impressões; a movimentação manual desta etapa cobre reposição/ajustes/perdas.
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -218,5 +225,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 10 — Filamentos**: CRUD em `filament/` no padrão dos módulos — filtros busca nome/marca/cor, material, ativo + flag `estoqueBaixo` (quantidade ≤ estoque mínimo); endpoints de movimentação de estoque `PATCH /filaments/{id}/estoque` (entrada/saída em gramas, recusa saldo negativo → 400) para consumo manual e reposição; validações de custo/diâmetro positivos).
+3. Implementar a próxima etapa pendente (**Etapa 11 — Estoque**: CRUD em `inventory/` (`InventoryItem` já existe, tabela `itens_estoque` da V5 — insumos gerais: peças, embalagens etc.; filamento NÃO entra aqui) no padrão dos módulos — rotas `/inventory`, filtros busca nome/descrição/categoria/localização, `categoria`, `ativo` e flag/filtro `estoqueBaixo` (quantidade ≤ quantidade mínima, mesmo padrão do módulo Filamentos); movimentação `PATCH /inventory/{id}/quantidade` (ENTRADA/SAIDA, recusa saldo negativo → 400, reusar `StockMovementType` de `filament/model` ou promovê-lo para `common/`); quantidades `NUMERIC(12,3)` com `unidadeMedida` (default `UN`)).
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.

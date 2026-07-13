@@ -59,4 +59,9 @@ public class Filament extends BaseEntity {
 
     @Column(nullable = false)
     private boolean ativo = true;
+
+    /** Estoque baixo: quantidade disponível menor ou igual ao mínimo configurado. */
+    public boolean isEstoqueBaixo() {
+        return quantidadeEstoqueG.compareTo(estoqueMinimoG) <= 0;
+    }
 }
