@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 8).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 9).
 
 ---
 
@@ -97,8 +97,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 6 | JWT | ✅ Concluída (login/refresh/logout testados via HTTP real) |
 | 7 | Usuários | ✅ Concluída (18 cenários E2E via HTTP real) |
 | 8 | Clientes | ✅ Concluída (13 cenários E2E via HTTP real) |
-| 9 | Impressoras | ⬜ **PRÓXIMA** |
-| 10 | Filamentos | ⬜ |
+| 9 | Impressoras | ✅ Concluída (15 cenários E2E via HTTP real) |
+| 10 | Filamentos | ⬜ **PRÓXIMA** |
 | 11 | Estoque | ⬜ |
 | 12 | Pedidos | ⬜ |
 | 13 | Orçamentos | ⬜ |
@@ -189,6 +189,10 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - CPF/CNPJ: opcional, armazenado como informado (com máscara); em branco vira `null` (unicidade só vale quando informado) → duplicado dá 409. Filtros: `busca` (nome/e-mail/CPF-CNPJ), `tipoPessoa`, `ativo`.
 - Soft delete preserva histórico de pedidos/orçamentos (FKs apontam para o cliente).
 
+### Módulo Impressoras (Etapa 9)
+- CRUD padrão em `/printers` (filtros: busca nome/marca/modelo, status, ativo). `PATCH /{id}/status` muda a situação operacional (recusa em impressora desativada → 400); soft delete marca INATIVA, reativação volta DISPONIVEL.
+- **Configurações de custo** (`PrinterConfigurationController`, escrita **só ADMINISTRADOR**): `GET|PUT /printers/config` (global, upsert) e `GET|PUT|DELETE /printers/{id}/config` (própria, upsert). O `GET /{id}/config` retorna a **configuração efetiva** — própria se existir, senão global — com campo `origem` (`PROPRIA`/`GLOBAL`); sem global cadastrada → 404 com mensagem orientando o PUT. **A Etapa 13 (Orçamentos) deve usar `PrinterConfigurationService.buscarEfetiva`** como fonte dos parâmetros de custo.
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -214,5 +218,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 9 — Impressoras**: CRUD em `printer/` no padrão dos módulos anteriores + gestão de `PrinterConfiguration` — endpoints para a configuração global de custos (valorKwh, valorHoraMaquina, custoDesgasteHora, markupPadrao) e configuração por impressora, com `PATCH /printers/{id}/status` para mudar a situação operacional; filtros: busca nome/marca/modelo, status, ativo).
+3. Implementar a próxima etapa pendente (**Etapa 10 — Filamentos**: CRUD em `filament/` no padrão dos módulos — filtros busca nome/marca/cor, material, ativo + flag `estoqueBaixo` (quantidade ≤ estoque mínimo); endpoints de movimentação de estoque `PATCH /filaments/{id}/estoque` (entrada/saída em gramas, recusa saldo negativo → 400) para consumo manual e reposição; validações de custo/diâmetro positivos).
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.

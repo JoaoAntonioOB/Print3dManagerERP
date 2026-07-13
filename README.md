@@ -103,7 +103,7 @@ npm run dev
 6. ✅ JWT
 7. ✅ Usuários
 8. ✅ Clientes
-9. ⬜ Impressoras
+9. ✅ Impressoras
 10. ⬜ Filamentos
 11. ⬜ Estoque
 12. ⬜ Pedidos
