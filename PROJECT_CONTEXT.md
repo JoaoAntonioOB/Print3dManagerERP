@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-13** (fim da Etapa 10).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-13** (fim da Etapa 11).
 
 ---
 
@@ -99,8 +99,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 8 | Clientes | ✅ Concluída (13 cenários E2E via HTTP real) |
 | 9 | Impressoras | ✅ Concluída (15 cenários E2E via HTTP real) |
 | 10 | Filamentos | ✅ Concluída (20 cenários E2E via HTTP real) |
-| 11 | Estoque | ⬜ **PRÓXIMA** |
-| 12 | Pedidos | ⬜ |
+| 11 | Estoque | ✅ Concluída (21 cenários E2E via HTTP real) |
+| 12 | Pedidos | ⬜ **PRÓXIMA** |
 | 13 | Orçamentos | ⬜ |
 | 14 | Dashboard (gráficos + indicadores) | ⬜ |
 | 15 | Financeiro | ⬜ |
@@ -196,9 +196,16 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 ### Módulo Filamentos (Etapa 10)
 - CRUD padrão em `/filaments` (filtros: busca nome/marca/cor, `material`, `ativo`, `estoqueBaixo`). Mesmos níveis de acesso das impressoras (`PODE_GERENCIAR` / `PODE_CONSULTAR`).
 - `FilamentResponse` traz o campo calculado **`estoqueBaixo`** (`quantidade ≤ estoque mínimo`) — método `Filament.isEstoqueBaixo()` na entidade, mapeado automaticamente pelo MapStruct; o filtro `estoqueBaixo` da listagem compara as duas colunas na Specification.
-- **Estoque só muda por `PATCH /filaments/{id}/estoque`** (`{tipo: ENTRADA|SAIDA, quantidadeG}` — enum `StockMovementType`): saída maior que o saldo → 400; movimentação em filamento desativado → 400. O PUT **não** toca em `quantidadeEstoqueG` (campo ausente do `FilamentUpdateRequest`).
+- **Estoque só muda por `PATCH /filaments/{id}/estoque`** (`{tipo: ENTRADA|SAIDA, quantidadeG}` — enum `StockMovementType`, em `common/model/` desde a Etapa 11): saída maior que o saldo → 400; movimentação em filamento desativado → 400. O PUT **não** toca em `quantidadeEstoqueG` (campo ausente do `FilamentUpdateRequest`).
 - Defaults do cadastro via MapStruct `defaultValue` no `toEntity` (diâmetro `1.75`, estoques `0`) — campos omitidos no POST assumem os mesmos defaults do banco.
 - **A Etapa 12 (Pedidos) fará o consumo automático de estoque** ao registrar impressões; a movimentação manual desta etapa cobre reposição/ajustes/perdas.
+
+### Módulo Estoque (Etapa 11)
+- Espelho do módulo Filamentos para insumos gerais (`InventoryItem`, tabela `itens_estoque` da V5 — filamento NÃO entra aqui). Rotas `/inventory`, mesmos níveis de acesso (`PODE_GERENCIAR` / `PODE_CONSULTAR`).
+- Filtros: `busca` (nome/descrição/categoria/localização), `categoria` (igualdade case-insensitive), `ativo`, `estoqueBaixo` (quantidade ≤ quantidade mínima, com `isEstoqueBaixo()` na entidade + comparação de colunas na Specification).
+- **Quantidade só muda por `PATCH /inventory/{id}/estoque`** (`{tipo: ENTRADA|SAIDA, quantidade}` na unidade de medida do item, `NUMERIC(12,3)` aceita fração): saldo negativo → 400 (mensagem inclui a `unidadeMedida`); item desativado → 400. PUT não toca em `quantidade`.
+- Defaults do cadastro via MapStruct `defaultValue`: quantidades `0`, `unidadeMedida` `UN`.
+- **`StockMovementType` foi promovido para `common/model/`** (compartilhado entre `/filaments` e `/inventory`).
 
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
@@ -225,5 +232,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 11 — Estoque**: CRUD em `inventory/` (`InventoryItem` já existe, tabela `itens_estoque` da V5 — insumos gerais: peças, embalagens etc.; filamento NÃO entra aqui) no padrão dos módulos — rotas `/inventory`, filtros busca nome/descrição/categoria/localização, `categoria`, `ativo` e flag/filtro `estoqueBaixo` (quantidade ≤ quantidade mínima, mesmo padrão do módulo Filamentos); movimentação `PATCH /inventory/{id}/quantidade` (ENTRADA/SAIDA, recusa saldo negativo → 400, reusar `StockMovementType` de `filament/model` ou promovê-lo para `common/`); quantidades `NUMERIC(12,3)` com `unidadeMedida` (default `UN`)).
+3. Implementar a próxima etapa pendente (**Etapa 12 — Pedidos**: módulo `order/` com `Order` + `OrderItem` + `PrintHistory` (entidades e tabelas V6/V8 já existem). Escopo sugerido: CRUD de pedidos em `/orders` com itens aninhados (cascade ALL + orphanRemoval já configurados, helpers `adicionarItem`/`removerItem`); geração do `numero` `PED-<ano>-<sequencial>` pela aplicação (única por ano, cuidado com concorrência); máquina de estados de `OrderStatus` (PENDENTE → EM_PRODUCAO → CONCLUIDO → ENTREGUE, CANCELADO com regras de quando é permitido); `valorTotal` calculado dos itens (quantidade × preço unitário − desconto); histórico de impressões `POST /orders/{id}/items/{itemId}/prints` ou rota própria `/prints` — registrar job com impressora/filamento/operador, **consumir estoque do filamento** (`peso_utilizado_g`) na conclusão e devolver em caso de falha conforme regra a definir com o usuário; upload de STL/3MF (`arquivo_modelo`, `application.storage.upload-dir`) pode ficar para etapa posterior se o usuário preferir. Decidir com o usuário o recorte exato antes de codar.)
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.

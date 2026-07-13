@@ -105,7 +105,7 @@ npm run dev
 8. ✅ Clientes
 9. ✅ Impressoras
 10. ✅ Filamentos
-11. ⬜ Estoque
+11. ✅ Estoque
 12. ⬜ Pedidos
 13. ⬜ Orçamentos
 14. ⬜ Dashboard
