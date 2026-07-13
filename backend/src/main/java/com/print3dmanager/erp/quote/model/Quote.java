@@ -105,4 +105,14 @@ public class Quote extends BaseEntity {
     private Instant aprovadoEm;
 
     private String observacoes;
+
+    /** Soma dos custos decompostos. */
+    public BigDecimal getCustoTotal() {
+        return custoFilamento.add(custoEnergia).add(custoHoraMaquina).add(custoDesgaste);
+    }
+
+    /** Preço apresentado ao cliente: o final, quando definido; senão o sugerido. */
+    public BigDecimal getPrecoEfetivo() {
+        return precoFinal != null ? precoFinal : precoSugerido;
+    }
 }

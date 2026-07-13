@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-13** (fim da Etapa 12).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-13** (fim da Etapa 13).
 
 ---
 
@@ -101,8 +101,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 10 | Filamentos | ✅ Concluída (20 cenários E2E via HTTP real) |
 | 11 | Estoque | ✅ Concluída (21 cenários E2E via HTTP real) |
 | 12 | Pedidos | ✅ Concluída (34 cenários E2E via HTTP real; upload de STL adiado) |
-| 13 | Orçamentos | ⬜ **PRÓXIMA** |
-| 14 | Dashboard (gráficos + indicadores) | ⬜ |
+| 13 | Orçamentos | ✅ Concluída (30 cenários E2E via HTTP real) |
+| 14 | Dashboard (gráficos + indicadores) | ⬜ **PRÓXIMA** |
 | 15 | Financeiro | ⬜ |
 | 16 | Relatórios (PDF) | ⬜ |
 | 17 | Frontend React | ⬜ |
@@ -216,6 +216,13 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - **Custo real do job** (`custoTotal`): filamento (peso × custo/kg) + energia (kWh × `valorKwh`) + máquina ((`valorHoraMaquina` + `custoDesgasteHora`) × horas), usando `PrinterConfigurationService.buscarEfetivaOpcional` (novo método — efetiva sem exigir global cadastrada; componentes sem dados são omitidos, sem nenhum → null).
 - Filtros de `/prints`: `impressoraId`, `status`, `itemPedidoId`, `de`/`ate` (ISO-8601 sobre `iniciadoEm`); sort default `iniciadoEm,desc`; respostas com nomes resolvidos (impressora/filamento/peça/número do pedido/operador) via `@EntityGraph`.
 
+### Módulo Orçamentos (Etapa 13)
+- **Strategy de precificação** em `quote/service/pricing/`: interface `PricingStrategy` (`calcular(PricingInput) → PricingResult`) com a política padrão `CostMarkupPricingStrategy` — filamento (peso × custo/kg) + energia (potência da impressora × horas × `valorKwh`) + hora máquina + desgaste, e markup % sobre o total. Componentes sem dados entram como zero; **cada componente é arredondado antes da soma** para a conta exibida fechar com o preço. Novas políticas (ex.: preço por grama) plugam pela interface sem tocar no `QuoteService`.
+- **`/quotes`**: CRUD no padrão (filtros `busca` número/cliente, `status`, `clienteId`); número `ORC-<ano>-<seq>` (mesmo advisory lock dos pedidos, chave própria); `markup` omitido no POST usa o `markupPadrao` da configuração efetiva (`buscarEfetivaOpcional(impressoraId nullable)` — sem impressora cai na global; fallback final 100%); `precoFinal` opcional sobrepõe o sugerido (`precoEfetivo` = final ?? sugerido, exposto como getter da entidade junto com `custoTotal`).
+- **Ciclo**: RASCUNHO→ENVIADO; ENVIADO→RASCUNHO (volta para editar)|APROVADO|REJEITADO|EXPIRADO; APROVADO/REJEITADO/EXPIRADO/CONVERTIDO terminais via PATCH. Edição (PUT, recalcula custos) e DELETE só em RASCUNHO. `CONVERTIDO` **apenas** via `POST /quotes/{id}/converter`.
+- **Link público** (`/public/quotes/{shareToken}`, sem login): `GET` (visão do cliente — `PublicQuoteResponse` SEM custos internos/markup/preço sugerido, só o preço efetivo), `POST .../aprovar|recusar` (exigem ENVIADO). RASCUNHO → 404; token inválido → 404 (parse de UUID no service). **Expiração preguiçosa**: ENVIADO com `dataValidade` vencida vira EXPIRADO em qualquer acesso público (métodos públicos são `@Transactional` de escrita por isso).
+- **Conversão em pedido**: exige APROVADO; monta `OrderCreateRequest` (item único: nomePeca = descrição truncada em 160 ou "Orçamento NUM", preço unitário = `precoEfetivo`, peso/tempo/filamento do orçamento) e **reusa `OrderService.criar`** (número PED, validações); vincula `pedido_id`, marca CONVERTIDO e retorna o `OrderResponse` (201).
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -241,5 +248,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 13 — Orçamentos**: módulo `quote/` (`Quote` e tabela V7 já existem, com `shareToken` UUID). Escopo: CRUD em `/quotes` no padrão dos módulos; **Strategy de precificação** usando a regra central — custo filamento (peso × custo/kg) + energia + hora máquina + desgaste + margem (`markup` editável, default `markupPadrao` da configuração efetiva via `PrinterConfigurationService`; custos decompostos já têm colunas próprias em `orcamentos`); ciclo de status de `QuoteStatus` (ver CHECK da V7); **link público** `GET/POST /public/quotes/{shareToken}` para o cliente visualizar e aprovar/recusar sem login (rota `/public/**` já liberada no SecurityConfig desde a Etapa 5); conversão de orçamento aprovado em pedido (reusar a geração de número do `OrderService`). O cálculo do custo real de jobs em `PrintHistoryService.calcularCusto` é referência da mesma fórmula sem markup. Upload de STL/3MF continua adiado.)
+3. Implementar a próxima etapa pendente (**Etapa 14 — Dashboard**: módulo `dashboard/` com endpoints somente-leitura de indicadores agregados para o frontend (Recharts na Etapa 17). Escopo sugerido: `GET /dashboard/resumo` (contadores: pedidos por status, orçamentos por status, impressoras por status, filamentos com estoque baixo, itens de estoque baixos, clientes ativos) + séries para gráficos (ex.: pedidos e faturamento por mês — `valor_total` de pedidos ENTREGUEs; consumo de filamento por mês a partir de `historico_impressoes.peso_utilizado_g`; taxa de sucesso de impressões CONCLUIDA×FALHOU; top clientes). Usar queries de agregação (JPQL/`@Query` ou projeções) — sem entidade nova nem migração. Todos os perfis autenticados podem consultar (inclusive FINANCEIRO/VISUALIZADOR). Definir recorte exato com o usuário se houver dúvida. Upload de STL/3MF continua adiado.)
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
