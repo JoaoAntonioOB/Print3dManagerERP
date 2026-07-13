@@ -96,8 +96,8 @@ npm run dev
 ## Roadmap de implementação
 
 1. ✅ Estrutura do projeto
-2. ⬜ Docker
-3. ⬜ Flyway
+2. ✅ Docker
+3. ✅ Flyway
 4. ⬜ Banco de dados
 5. ⬜ Spring Security
 6. ⬜ JWT

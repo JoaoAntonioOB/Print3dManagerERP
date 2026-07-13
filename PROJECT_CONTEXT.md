@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 2).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 3).
 
 ---
 
@@ -90,9 +90,9 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | # | Etapa | Status |
 |---|-------|--------|
 | 1 | Estrutura do projeto | ✅ Concluída |
-| 2 | Docker | ✅ Concluída (não testada — Docker não instalado na máquina) |
-| 3 | Flyway | ⬜ **PRÓXIMA** |
-| 4 | Banco de dados | ⬜ |
+| 2 | Docker | ✅ Concluída (testada — containers sobem, Postgres healthy) |
+| 3 | Flyway | ✅ Concluída (V1–V9 aplicadas e validadas no Postgres do Docker) |
+| 4 | Banco de dados (entidades JPA + BaseEntity) | ⬜ **PRÓXIMA** |
 | 5 | Spring Security | ⬜ |
 | 6 | JWT | ⬜ |
 | 7 | Usuários | ⬜ |
@@ -128,7 +128,7 @@ Print3d Manager ERP/
 │       ├── main/resources/application.yml        # comum + JWT/CORS/uploads (prefixo application.*)
 │       ├── main/resources/application-dev.yml    # Postgres local + SQL logging
 │       ├── main/resources/application-prod.yml   # tudo via env vars
-│       ├── main/resources/db/migration/          # VAZIO — Flyway entra na Etapa 3
+│       ├── main/resources/db/migration/          # V1__..V9__ — schema base completo (pt-BR)
 │       └── test/java/.../Print3dManagerErpApplicationTests.java  # teste de sanidade
 └── frontend/
     ├── README.md              # placeholder — projeto Vite só na Etapa 17
@@ -137,7 +137,17 @@ Print3d Manager ERP/
     └── .dockerignore
 ```
 
-**Build validado:** `mvnw compile` e `mvnw test` passam (Java 21 local).
+**Build validado:** `mvnw compile` e `mvnw test` passam (Java 21 local). Aplicação bootou com perfil `dev` contra o Postgres do Docker e o Flyway aplicou as 9 migrações (`flyway_schema_history` em v9).
+
+### Schema do banco (Etapa 3 — decisões)
+- **Tabelas/colunas em português** (`usuarios`, `clientes`, `impressoras`, `configuracoes_impressora`, `filamentos`, `itens_estoque`, `pedidos`, `itens_pedido`, `orcamentos`, `historico_impressoes`, `transacoes_financeiras`); entidades Java em inglês mapeiam via `@Table`/`@Column`.
+- IDs `BIGINT GENERATED ALWAYS AS IDENTITY`; timestamps `TIMESTAMPTZ` (`criado_em`/`atualizado_em`, default `now()`); soft delete via `ativo` nos cadastros mestres.
+- Enums como `VARCHAR + CHECK` (não enum nativo do PG) para casar com `@Enumerated(STRING)` e facilitar evolução.
+- `orcamentos.share_token UUID UNIQUE DEFAULT gen_random_uuid()` (link público de aprovação); custos decompostos (filamento/energia/hora máquina/desgaste) + `markup` em %.
+- `configuracoes_impressora.impressora_id NULL` = configuração global (índice parcial único garante no máx. 1 global); 1:1 opcional com impressora.
+- `numero` de pedidos/orçamentos: `VARCHAR(20) UNIQUE`, gerado pela aplicação (ex.: `PED-2026-0001`).
+- `itens_pedido` deleta em cascata com o pedido; `historico_impressoes.item_pedido_id` usa `ON DELETE SET NULL`.
+- Estoque de filamento fica em `filamentos` (gramas); `itens_estoque` é só para insumos gerais.
 
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
@@ -149,11 +159,11 @@ Print3d Manager ERP/
 
 ## 7. Pendências e observações do ambiente
 
-1. **Docker Desktop NÃO está instalado** na máquina do usuário. Instalar com `winget install Docker.DockerDesktop` antes da Etapa 4 (necessário para subir o Postgres e validar migrações). O compose nunca foi executado.
-2. **`JAVA_HOME` não está configurado** no Windows. O JDK está em `C:\Program Files\Java\jdk-21.0.10` — foi setado manualmente na sessão para rodar o `mvnw`. Recomendar configurar como variável de sistema.
+1. **Docker Desktop instalado e funcionando** — `docker compose up -d postgres` sobe o banco (container `print3d-postgres`, healthy). O projeto também já está no GitHub.
+2. **`JAVA_HOME` não está configurado** no Windows. O JDK está em `C:\Program Files\Java\jdk-21.0.10` — setar na sessão antes de rodar o `mvnw` (`$env:JAVA_HOME='C:\Program Files\Java\jdk-21.0.10'`). Recomendar configurar como variável de sistema.
 3. **Maven não está instalado** — usar sempre `.\mvnw.cmd` (Windows) dentro de `backend/`.
 4. O serviço `frontend` do `docker-compose.yml` está **comentado** — descomentar na Etapa 17.
-5. O **git repo root é `C:\repository`** (pai de vários projetos não relacionados do usuário). Cuidado com `git add .` fora da pasta do projeto.
+5. O git repo root é a **própria pasta do projeto** (`C:\repository\Print3d Manager ERP`), com remote `origin` → `github.com/JoaoAntonioOB/Print3dManagerERP`.
 6. Segredo JWT tem **default de dev** no yml/compose (base64) — em produção deve vir do `.env` (`openssl rand -base64 48`).
 7. Testes de contexto Spring reais (Testcontainers) ficam para a Etapa 18 — o teste atual é só de sanidade para o build passar sem banco.
 8. Máquina: Windows 11, PowerShell 5.1. O terminal do usuário usa pt-BR.
@@ -164,5 +174,5 @@ Print3d Manager ERP/
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 3 — Flyway**: migração `V1__` com schema base conforme entidades da seção 4).
+3. Implementar a próxima etapa pendente (**Etapa 4 — Banco de dados**: `BaseEntity` em `common/`, entidades JPA de todos os módulos mapeando o schema das migrações V1–V9, enums Java correspondentes aos CHECKs; validar com boot da aplicação — `ddl-auto: validate` acusa qualquer divergência).
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
