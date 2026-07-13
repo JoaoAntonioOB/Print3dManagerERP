@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 4).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 5).
 
 ---
 
@@ -93,8 +93,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 2 | Docker | ✅ Concluída (testada — containers sobem, Postgres healthy) |
 | 3 | Flyway | ✅ Concluída (V1–V9 aplicadas e validadas no Postgres do Docker) |
 | 4 | Banco de dados (entidades JPA + BaseEntity) | ✅ Concluída (boot validado com `ddl-auto: validate`) |
-| 5 | Spring Security | ⬜ **PRÓXIMA** |
-| 6 | JWT | ⬜ |
+| 5 | Spring Security | ✅ Concluída (401/403 JSON validados via HTTP real) |
+| 6 | JWT | ⬜ **PRÓXIMA** |
 | 7 | Usuários | ⬜ |
 | 8 | Clientes | ⬜ |
 | 9 | Impressoras | ⬜ |
@@ -158,6 +158,14 @@ Print3d Manager ERP/
 - `Quote.shareToken` inicializado com `UUID.randomUUID()` na aplicação (o default do banco é fallback); campos monetários `BigDecimal` com defaults `ZERO` onde o banco tem `DEFAULT 0`.
 - `PrintHistory` e `PrintStatus` ficam no módulo `order` (junto de pedidos/itens, conforme arquitetura).
 
+### Segurança (Etapa 5 — decisões)
+- `security/SecurityConfig`: chain **stateless** (sem CSRF/sessão/formLogin/httpBasic), `@EnableMethodSecurity` para `@PreAuthorize` nos controllers futuros.
+- Rotas públicas (sem o context path `/api`): `/auth/**` (Etapa 6), `/public/**` (aprovação de orçamento, Etapa 13), Swagger (`/v3/api-docs/**`, `/swagger-ui/**`), `/actuator/health|info`, e `OPTIONS /**` (preflight CORS). Todo o resto exige autenticação.
+- 401/403 respondem JSON via `RestAuthenticationEntryPoint`/`RestAccessDeniedHandler` usando `common/dto/ApiErrorResponse` (record: timestamp, status, error, message, path) — mesmo formato que o futuro `@RestControllerAdvice` usará.
+- `DatabaseUserDetailsService` carrega por e-mail via `UserRepository` (primeiro repository do projeto); `SecurityUser` adapta a entidade `User` (authority `ROLE_<role>`, `isEnabled` ← `ativo`).
+- `PasswordEncoder` BCrypt e `AuthenticationManager` (via `AuthenticationConfiguration`) já expostos como beans para o login JWT da Etapa 6.
+- CORS centralizado em `CorsConfigurationSource` lendo `config/CorsProperties` (`application.cors.allowed-origins`), com `allowCredentials` e header `Content-Disposition` exposto (downloads de relatórios).
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -183,5 +191,5 @@ Print3d Manager ERP/
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 5 — Spring Security**: `SecurityConfig` em `security/` com SecurityFilterChain stateless, liberação de Swagger/actuator/rotas públicas, `PasswordEncoder` BCrypt, `UserDetailsService` sobre a entidade `User`, tratamento de 401/403 em JSON; o JWT em si é a Etapa 6).
+3. Implementar a próxima etapa pendente (**Etapa 6 — JWT**: `JwtService` com jjwt 0.12.5 lendo `application.security.jwt.*` via propriedades tipadas, filtro `OncePerRequestFilter` antes do `UsernamePasswordAuthenticationFilter`, endpoints `/auth/login` e `/auth/refresh` com refresh token persistido — precisa de migração V10 para a tabela de refresh tokens —, DTOs record + Swagger, e `OpenApiConfig` com esquema bearer).
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
