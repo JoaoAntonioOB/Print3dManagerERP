@@ -102,7 +102,7 @@ npm run dev
 5. ✅ Spring Security
 6. ✅ JWT
 7. ✅ Usuários
-8. ⬜ Clientes
+8. ✅ Clientes
 9. ⬜ Impressoras
 10. ⬜ Filamentos
 11. ⬜ Estoque

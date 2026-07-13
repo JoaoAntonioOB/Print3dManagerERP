@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 7).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-12** (fim da Etapa 8).
 
 ---
 
@@ -96,8 +96,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 5 | Spring Security | ✅ Concluída (401/403 JSON validados via HTTP real) |
 | 6 | JWT | ✅ Concluída (login/refresh/logout testados via HTTP real) |
 | 7 | Usuários | ✅ Concluída (18 cenários E2E via HTTP real) |
-| 8 | Clientes | ⬜ **PRÓXIMA** |
-| 9 | Impressoras | ⬜ |
+| 8 | Clientes | ✅ Concluída (13 cenários E2E via HTTP real) |
+| 9 | Impressoras | ⬜ **PRÓXIMA** |
 | 10 | Filamentos | ⬜ |
 | 11 | Estoque | ⬜ |
 | 12 | Pedidos | ⬜ |
@@ -183,6 +183,12 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - **Regras**: soft delete (`DELETE` → `ativo=false` + revoga refresh tokens; login passa a dar 401 na hora); não pode desativar a si mesmo (400); `PATCH /{id}/ativar` reativa; troca de senha exige senha atual e revoga todas as sessões do usuário.
 - Endpoints: `GET /users` (busca nome/e-mail, role, ativo, paginado), `GET/PUT/DELETE /users/{id}`, `POST /users`, `PATCH /users/{id}/ativar`, `GET /users/me`, `PATCH /users/me/senha`.
 
+### Módulo Clientes (Etapa 8)
+- Segue o padrão do módulo Usuários. Rotas `/clients` (inglês, como `/users`). Dois níveis de acesso via constantes `PODE_GERENCIAR` (ADMINISTRADOR, OPERADOR) e `PODE_CONSULTAR` (+ FINANCEIRO, VISUALIZADOR — CLIENTE não acessa).
+- `AddressDto` aninhado com validações de UF (`[A-Z]{2}`) e CEP (`\d{5}-?\d{3}`); MapStruct mapeia o embeddable automaticamente; PUT substitui o endereço por completo (inclusive para null).
+- CPF/CNPJ: opcional, armazenado como informado (com máscara); em branco vira `null` (unicidade só vale quando informado) → duplicado dá 409. Filtros: `busca` (nome/e-mail/CPF-CNPJ), `tipoPessoa`, `ativo`.
+- Soft delete preserva histórico de pedidos/orçamentos (FKs apontam para o cliente).
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -208,5 +214,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 8 — Clientes**: CRUD em `client/` seguindo o padrão do módulo Usuários — MapStruct com `Address` embeddable, filtros por busca/tipoPessoa/ativo, validação de CPF/CNPJ único → 409, soft delete; acesso: ADMINISTRADOR e OPERADOR gerenciam, demais roles autenticadas podem consultar).
+3. Implementar a próxima etapa pendente (**Etapa 9 — Impressoras**: CRUD em `printer/` no padrão dos módulos anteriores + gestão de `PrinterConfiguration` — endpoints para a configuração global de custos (valorKwh, valorHoraMaquina, custoDesgasteHora, markupPadrao) e configuração por impressora, com `PATCH /printers/{id}/status` para mudar a situação operacional; filtros: busca nome/marca/modelo, status, ativo).
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
