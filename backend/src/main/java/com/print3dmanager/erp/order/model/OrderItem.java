@@ -52,4 +52,9 @@ public class OrderItem extends BaseEntity {
     /** Caminho do arquivo STL/3MF no diretório de uploads. */
     @Column(name = "arquivo_modelo", length = 255)
     private String arquivoModelo;
+
+    /** Subtotal do item: quantidade × preço unitário. */
+    public BigDecimal getSubtotal() {
+        return precoUnitario.multiply(BigDecimal.valueOf(quantidade));
+    }
 }

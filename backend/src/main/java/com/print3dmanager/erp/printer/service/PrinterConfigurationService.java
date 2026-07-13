@@ -12,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 /**
  * Configurações de custo para orçamentos: uma global (obrigatória para
  * orçar) e, opcionalmente, uma por impressora que a sobrepõe.
@@ -51,6 +53,17 @@ public class PrinterConfigurationService {
         return configRepository.findByImpressoraId(impressoraId)
                 .map(config -> printerMapper.toConfigResponse(config, ORIGEM_PROPRIA))
                 .orElseGet(() -> printerMapper.toConfigResponse(obterGlobal(), ORIGEM_GLOBAL));
+    }
+
+    /**
+     * Configuração efetiva como entidade, sem exigir que exista — usada por
+     * cálculos internos (custo de impressões, orçamentos) que degradam
+     * educadamente quando nenhuma configuração foi cadastrada.
+     */
+    @Transactional(readOnly = true)
+    public Optional<PrinterConfiguration> buscarEfetivaOpcional(Long impressoraId) {
+        return configRepository.findByImpressoraId(impressoraId)
+                .or(configRepository::findByImpressoraIsNull);
     }
 
     /** Cria ou atualiza a configuração própria da impressora (upsert). */

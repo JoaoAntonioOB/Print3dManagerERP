@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-13** (fim da Etapa 11).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-13** (fim da Etapa 12).
 
 ---
 
@@ -100,8 +100,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 9 | Impressoras | ✅ Concluída (15 cenários E2E via HTTP real) |
 | 10 | Filamentos | ✅ Concluída (20 cenários E2E via HTTP real) |
 | 11 | Estoque | ✅ Concluída (21 cenários E2E via HTTP real) |
-| 12 | Pedidos | ⬜ **PRÓXIMA** |
-| 13 | Orçamentos | ⬜ |
+| 12 | Pedidos | ✅ Concluída (34 cenários E2E via HTTP real; upload de STL adiado) |
+| 13 | Orçamentos | ⬜ **PRÓXIMA** |
 | 14 | Dashboard (gráficos + indicadores) | ⬜ |
 | 15 | Financeiro | ⬜ |
 | 16 | Relatórios (PDF) | ⬜ |
@@ -207,6 +207,15 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - Defaults do cadastro via MapStruct `defaultValue`: quantidades `0`, `unidadeMedida` `UN`.
 - **`StockMovementType` foi promovido para `common/model/`** (compartilhado entre `/filaments` e `/inventory`).
 
+### Módulo Pedidos + Impressões (Etapa 12)
+- **`/orders`**: listagem retorna `OrderSummaryResponse` (sem itens, `@EntityGraph` no cliente evita N+1); `GET /{id}` retorna `OrderResponse` completo (`findDetalhadoById` com grafo cliente/usuário/itens/filamento). Filtros: `busca` (número/nome do cliente), `status`, `clienteId`; sort default `criadoEm,desc`.
+- **Número do pedido**: `PED-<ano>-<seq 4 dígitos>` gerado em `OrderService.gerarNumero()` — `pg_advisory_xact_lock(hashtext('pedidos_numero_<ano>'))` serializa a geração concorrente (backstop: unique constraint). Último número do ano localizado por `findTopByNumeroStartingWithOrderByIdDesc` (id, não string — sobrevive a sequências > 9999).
+- **Itens**: geridos junto com o pedido. `PUT /orders/{id}` substitui a lista (com `id` atualiza, sem `id` cria, ausentes removidos via orphanRemoval; item de outro pedido → 400). `valorTotal` sempre recalculado (Σ `quantidade × precoUnitario` − `desconto`; desconto > subtotal → 400). `OrderItem.getSubtotal()` exposto nos DTOs. `arquivoModelo` fica intacto no PUT (upload de STL adiado — não está nos DTOs de escrita).
+- **Máquina de estados** (`PATCH /{id}/status`): PENDENTE→EM_PRODUCAO|CANCELADO, EM_PRODUCAO→CONCLUIDO|CANCELADO, CONCLUIDO→ENTREGUE (grava `dataEntregaRealizada`); demais → 400. Edição (PUT) só em PENDENTE; `DELETE` (hard, cascata) só em PENDENTE — fora disso, cancelar.
+- **`/prints` (PrintHistory)**: `POST` inicia job (impressora precisa estar DISPONIVEL e ativa → vira IMPRIMINDO — bloqueia 2 jobs simultâneos na mesma máquina; item de pedido, se informado, exige pedido EM_PRODUCAO; operador = usuário autenticado). `PATCH /{id}/concluir|falhar|cancelar` (só de EM_ANDAMENTO): libera a impressora, soma `horasImpressaoTotal`, calcula `tempoTotalMinutos` e **abate `pesoUtilizadoG` do estoque do filamento** (também em falhas — material desperdiçado; saldo insuficiente → 400 e a transação reverte). `falhar` exige `motivoFalha`; `cancelar` aceita corpo opcional.
+- **Custo real do job** (`custoTotal`): filamento (peso × custo/kg) + energia (kWh × `valorKwh`) + máquina ((`valorHoraMaquina` + `custoDesgasteHora`) × horas), usando `PrinterConfigurationService.buscarEfetivaOpcional` (novo método — efetiva sem exigir global cadastrada; componentes sem dados são omitidos, sem nenhum → null).
+- Filtros de `/prints`: `impressoraId`, `status`, `itemPedidoId`, `de`/`ate` (ISO-8601 sobre `iniciadoEm`); sort default `iniciadoEm,desc`; respostas com nomes resolvidos (impressora/filamento/peça/número do pedido/operador) via `@EntityGraph`.
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -232,5 +241,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 12 — Pedidos**: módulo `order/` com `Order` + `OrderItem` + `PrintHistory` (entidades e tabelas V6/V8 já existem). Escopo sugerido: CRUD de pedidos em `/orders` com itens aninhados (cascade ALL + orphanRemoval já configurados, helpers `adicionarItem`/`removerItem`); geração do `numero` `PED-<ano>-<sequencial>` pela aplicação (única por ano, cuidado com concorrência); máquina de estados de `OrderStatus` (PENDENTE → EM_PRODUCAO → CONCLUIDO → ENTREGUE, CANCELADO com regras de quando é permitido); `valorTotal` calculado dos itens (quantidade × preço unitário − desconto); histórico de impressões `POST /orders/{id}/items/{itemId}/prints` ou rota própria `/prints` — registrar job com impressora/filamento/operador, **consumir estoque do filamento** (`peso_utilizado_g`) na conclusão e devolver em caso de falha conforme regra a definir com o usuário; upload de STL/3MF (`arquivo_modelo`, `application.storage.upload-dir`) pode ficar para etapa posterior se o usuário preferir. Decidir com o usuário o recorte exato antes de codar.)
+3. Implementar a próxima etapa pendente (**Etapa 13 — Orçamentos**: módulo `quote/` (`Quote` e tabela V7 já existem, com `shareToken` UUID). Escopo: CRUD em `/quotes` no padrão dos módulos; **Strategy de precificação** usando a regra central — custo filamento (peso × custo/kg) + energia + hora máquina + desgaste + margem (`markup` editável, default `markupPadrao` da configuração efetiva via `PrinterConfigurationService`; custos decompostos já têm colunas próprias em `orcamentos`); ciclo de status de `QuoteStatus` (ver CHECK da V7); **link público** `GET/POST /public/quotes/{shareToken}` para o cliente visualizar e aprovar/recusar sem login (rota `/public/**` já liberada no SecurityConfig desde a Etapa 5); conversão de orçamento aprovado em pedido (reusar a geração de número do `OrderService`). O cálculo do custo real de jobs em `PrintHistoryService.calcularCusto` é referência da mesma fórmula sem markup. Upload de STL/3MF continua adiado.)
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
