@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth } from './auth/RequireAuth';
 import { ClientsPage } from './pages/clients/ClientsPage';
+import { FilamentsPage } from './pages/filaments/FilamentsPage';
 import { AppLayout } from './layout/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
@@ -21,7 +22,7 @@ export function App() {
         <Route path="pedidos" element={<PlaceholderPage titulo="Pedidos" />} />
         <Route path="orcamentos" element={<PlaceholderPage titulo="Orçamentos" />} />
         <Route path="clientes" element={<ClientsPage />} />
-        <Route path="filamentos" element={<PlaceholderPage titulo="Filamentos" />} />
+        <Route path="filamentos" element={<FilamentsPage />} />
         <Route path="estoque" element={<PlaceholderPage titulo="Estoque" />} />
         <Route path="impressoras" element={<PlaceholderPage titulo="Impressoras" />} />
         <Route path="impressoes" element={<PlaceholderPage titulo="Impressões" />} />
