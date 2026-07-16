@@ -110,7 +110,7 @@ npm run dev
 13. ✅ Orçamentos
 14. ✅ Dashboard
 15. ✅ Financeiro
-16. ⬜ Relatórios
+16. ✅ Relatórios
 17. ⬜ Frontend React
 18. ⬜ Testes
 19. ⬜ Melhorias finais

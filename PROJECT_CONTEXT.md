@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-16** (fim da Etapa 15).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-16** (fim da Etapa 16).
 
 ---
 
@@ -104,8 +104,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 13 | Orçamentos | ✅ Concluída (30 cenários E2E via HTTP real) |
 | 14 | Dashboard (gráficos + indicadores) | ✅ Concluída (17 cenários E2E via HTTP real) |
 | 15 | Financeiro | ✅ Concluída (38 cenários E2E via HTTP real) |
-| 16 | Relatórios (PDF) | ⬜ **PRÓXIMA** |
-| 17 | Frontend React | ⬜ |
+| 16 | Relatórios (PDF) | ✅ Concluída (13 cenários E2E via HTTP real) |
+| 17 | Frontend React | ⬜ **PRÓXIMA** |
 | 18 | Testes (JUnit, Mockito, integração) | ⬜ |
 | 19 | Melhorias finais (rate limit, etc.) | ⬜ |
 
@@ -236,6 +236,13 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - **Faturamento de pedidos** (`financial/service/OrderBillingService`): `POST /orders/{id}/faturar` (só ADMINISTRADOR/FINANCEIRO) exige pedido CONCLUIDO ou ENTREGUE e cria receita PENDENTE (categoria "Vendas", valor = `valorTotal`, data = entrega realizada ?? hoje, vínculos pedido+cliente); pedido já com receita não cancelada → **409**; pedido sem valor → 400. **Entrega automática**: `OrderService.alterarStatus(ENTREGUE)` chama `gerarReceitaSeNecessario` — silencioso se já faturado ou sem valor (receita CANCELADA libera refaturamento — checagem `existsByPedidoIdAndTipoAndStatusNot`).
 - **Resumos** (`FinancialQueryRepository`, SQL nativo no padrão do dashboard): `GET /financial/resumo?de&ate` (default mês corrente UTC; CANCELADAS fora) → receitas/despesas pagas e pendentes, `saldoRealizado` (pagas) e `saldoPrevisto` (pagas+pendentes); `de` > `ate` → 400. `GET /financial/resumo/mensal?meses=` (1–60, `Math.clamp`) → série só de transações **PAGAS**, N meses completos zerados em ordem cronológica (padrão das séries do dashboard).
 
+### Módulo Relatórios (Etapa 16)
+- **OpenPDF 2.2.2** (`com.github.librepdf:openpdf`, decidido com o usuário — fork livre do iText 4, layout em código, sem templates externos). Sem entidade/migração nova.
+- **`report/service/pdf/PdfReportBuilder`** (padrão Builder): concentra TODO o layout OpenPDF — A4, cabeçalho (nome do sistema + título + período + gerado em UTC), tabela zebrada com colunas numéricas à direita, bloco de totais rótulo→valor, rodapé com numeração; período vazio vira "Nenhum registro no período." Os services só descrevem conteúdo (`comPeriodo`/`comColunas`/`comLinha`/`comTotal`/`gerar`). Fontes Helvetica built-in (WinAnsi cobre pt-BR).
+- **Endpoints** (GET, `produces application/pdf`, `Content-Disposition: attachment` com nome `relatorio-<tipo>_<de>-<ate>.pdf`; período default mês corrente UTC; `de` > `ate` → 400): `/reports/pedidos?de&ate&status` (pedidos abertos no período por `criado_em`, filtro opcional de status; totais: quantidade, cancelados, valor exceto cancelados); `/reports/financeiro?de&ate` (transações por `data_transacao`, canceladas identificadas + resumo reaproveitando `FinancialTransactionService.resumo`) — **restrito a ADMINISTRADOR/FINANCEIRO** (decidido com o usuário); `/reports/consumo-filamento?de&ate` (agregado por filamento das impressões finalizadas com peso registrado; totais de jobs/gramas/custo).
+- `ReportQueryRepository` com SQL nativo (padrão do dashboard); datas formatadas no próprio SQL (`to_char DD/MM/YYYY`) para não depender do mapeamento de tipos do Hibernate em query nativa; moeda formatada em pt-BR no service.
+- **Handler global ganhou `MethodArgumentTypeMismatchException` → 400** (enum/tipo inválido em query param dava 500 em TODOS os módulos; mensagem lista os valores aceitos quando o alvo é enum).
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -261,5 +268,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 16 — Relatórios (PDF)**: módulo `report/`. Escopo sugerido: geração de PDF (escolher lib com o usuário — OpenPDF/iText vs JasperReports vs flying-saucer+HTML) para relatórios de pedidos, financeiro (transações do período + resumo) e consumo de filamento; endpoints `GET /reports/...` com filtros de período, resposta `application/pdf` com `Content-Disposition` (header já exposto no CORS); reusar as agregações de `dashboard/` e `financial/` onde possível. Perfis: definir com o usuário (relatório financeiro provavelmente restrito a ADMINISTRADOR/FINANCEIRO). Upload de STL/3MF continua adiado.)
+3. Implementar a próxima etapa pendente (**Etapa 17 — Frontend React**: criar o projeto Vite em `frontend/` (React 19 + TypeScript; React Router, Axios, TanStack Query, React Hook Form, Zod, MUI, Recharts, React Hot Toast — stack da seção 2). Base já pronta: `frontend/Dockerfile` (Node 22 → NGINX) e `nginx.conf` (SPA + proxy `/api`) — descomentar o serviço `frontend` no `docker-compose.yml`; CORS do backend já libera `http://localhost:5173`. Escopo grande — combinar com o usuário por onde começar (sugestão: setup + login/refresh com interceptor Axios + layout com menu por perfil; depois telas módulo a módulo na ordem do backend). Toda a API está documentada no Swagger (`/api/swagger-ui.html`); séries do dashboard/financeiro já vêm prontas para Recharts; relatórios são downloads `application/pdf`. Upload de STL/3MF continua adiado.)
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.

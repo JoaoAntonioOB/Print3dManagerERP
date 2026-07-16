@@ -17,8 +17,10 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -100,6 +102,18 @@ public class GlobalExceptionHandler {
                                                                     HttpServletRequest request) {
         return construir(HttpStatus.BAD_REQUEST,
                 "Parâmetro de ordenação ou filtro inválido: " + ex.getPropertyName(),
+                request, null);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiErrorResponse> handleParametroInvalido(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        Class<?> tipoEsperado = ex.getRequiredType();
+        String valores = tipoEsperado != null && tipoEsperado.isEnum()
+                ? " Valores aceitos: " + Arrays.toString(tipoEsperado.getEnumConstants())
+                : "";
+        return construir(HttpStatus.BAD_REQUEST,
+                "Valor inválido para o parâmetro '%s'.%s".formatted(ex.getName(), valores),
                 request, null);
     }
 
