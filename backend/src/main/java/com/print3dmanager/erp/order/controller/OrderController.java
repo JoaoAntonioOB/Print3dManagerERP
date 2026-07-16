@@ -1,6 +1,8 @@
 package com.print3dmanager.erp.order.controller;
 
 import com.print3dmanager.erp.common.dto.PageResponse;
+import com.print3dmanager.erp.financial.dto.FinancialTransactionResponse;
+import com.print3dmanager.erp.financial.service.OrderBillingService;
 import com.print3dmanager.erp.order.dto.OrderCreateRequest;
 import com.print3dmanager.erp.order.dto.OrderResponse;
 import com.print3dmanager.erp.order.dto.OrderStatusRequest;
@@ -49,6 +51,7 @@ public class OrderController {
             "hasAnyRole('ADMINISTRADOR', 'OPERADOR', 'FINANCEIRO', 'VISUALIZADOR')";
 
     private final OrderService orderService;
+    private final OrderBillingService orderBillingService;
 
     @GetMapping
     @PreAuthorize(PODE_CONSULTAR)
@@ -100,6 +103,18 @@ public class OrderController {
     public OrderResponse alterarStatus(@PathVariable Long id,
                                        @Valid @RequestBody OrderStatusRequest request) {
         return orderService.alterarStatus(id, request.status());
+    }
+
+    @PostMapping("/{id}/faturar")
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'FINANCEIRO')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Fatura um pedido CONCLUIDO ou ENTREGUE manualmente",
+            description = "Cria a receita PENDENTE vinculada ao pedido e ao cliente no módulo "
+                    + "Financeiro. Pedido já faturado (receita não cancelada): 409. A entrega "
+                    + "(status ENTREGUE) também fatura automaticamente se ainda não houver "
+                    + "receita vinculada.")
+    public FinancialTransactionResponse faturar(@PathVariable Long id) {
+        return orderBillingService.faturar(id);
     }
 
     @DeleteMapping("/{id}")

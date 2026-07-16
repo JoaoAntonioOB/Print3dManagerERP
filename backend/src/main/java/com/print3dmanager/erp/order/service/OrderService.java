@@ -7,6 +7,7 @@ import com.print3dmanager.erp.common.exception.BusinessException;
 import com.print3dmanager.erp.common.exception.ResourceNotFoundException;
 import com.print3dmanager.erp.filament.model.Filament;
 import com.print3dmanager.erp.filament.repository.FilamentRepository;
+import com.print3dmanager.erp.financial.service.OrderBillingService;
 import com.print3dmanager.erp.order.dto.OrderCreateRequest;
 import com.print3dmanager.erp.order.dto.OrderItemRequest;
 import com.print3dmanager.erp.order.dto.OrderResponse;
@@ -55,6 +56,7 @@ public class OrderService {
     private final ClientRepository clientRepository;
     private final FilamentRepository filamentRepository;
     private final UserRepository userRepository;
+    private final OrderBillingService orderBillingService;
     private final OrderMapper orderMapper;
 
     @Transactional(readOnly = true)
@@ -119,8 +121,11 @@ public class OrderService {
                             .formatted(pedido.getStatus(), novoStatus));
         }
         pedido.setStatus(novoStatus);
-        if (novoStatus == OrderStatus.ENTREGUE && pedido.getDataEntregaRealizada() == null) {
-            pedido.setDataEntregaRealizada(LocalDate.now());
+        if (novoStatus == OrderStatus.ENTREGUE) {
+            if (pedido.getDataEntregaRealizada() == null) {
+                pedido.setDataEntregaRealizada(LocalDate.now());
+            }
+            orderBillingService.gerarReceitaSeNecessario(pedido);
         }
         return orderMapper.toResponse(pedido);
     }

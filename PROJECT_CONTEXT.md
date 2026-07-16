@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-13** (fim da Etapa 14).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-16** (fim da Etapa 15).
 
 ---
 
@@ -103,8 +103,8 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 12 | Pedidos | ✅ Concluída (34 cenários E2E via HTTP real; upload de STL adiado) |
 | 13 | Orçamentos | ✅ Concluída (30 cenários E2E via HTTP real) |
 | 14 | Dashboard (gráficos + indicadores) | ✅ Concluída (17 cenários E2E via HTTP real) |
-| 15 | Financeiro | ⬜ **PRÓXIMA** |
-| 16 | Relatórios (PDF) | ⬜ |
+| 15 | Financeiro | ✅ Concluída (38 cenários E2E via HTTP real) |
+| 16 | Relatórios (PDF) | ⬜ **PRÓXIMA** |
 | 17 | Frontend React | ⬜ |
 | 18 | Testes (JUnit, Mockito, integração) | ⬜ |
 | 19 | Melhorias finais (rate limit, etc.) | ⬜ |
@@ -229,6 +229,13 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - **Endpoints**: `GET /dashboard/resumo` (pedidos/orçamentos/impressoras por status — **todas as chaves do enum presentes, ausência = 0** —, filamentos e itens com estoque baixo, clientes ativos, impressões em andamento, pedidos e faturamento do mês corrente); `vendas-mensais?meses=` (pedidos abertos por `criado_em` + faturamento ENTREGUE por `data_entrega_realizada`); `consumo-filamento?meses=` (Σ `peso_utilizado_g` por mês de `finalizado_em`); `taxa-sucesso` (CONCLUIDA ÷ (CONCLUIDA+FALHOU) %, null sem finalizadas); `top-clientes?limite=` (Σ `valor_total` sem CANCELADOs, ordem decrescente).
 - **Séries mensais sempre devolvem os N meses completos** (janela 1–60 incluindo o corrente, faltantes zerados, ordem cronológica) — prontas para os gráficos Recharts da Etapa 17 sem tratamento no frontend.
 
+### Módulo Financeiro (Etapa 15)
+- **Perfis diferentes do padrão dos CRUDs**: ADMINISTRADOR e **FINANCEIRO** gerenciam (`PODE_GERENCIAR`); OPERADOR e VISUALIZADOR apenas consultam. Sem migração nova (tabela `transacoes_financeiras` da V9; `valor` sempre positivo — o sinal é dado por `tipo` RECEITA/DESPESA).
+- **`/financial/transactions`**: CRUD no padrão (filtros: `busca` descrição/categoria/observações, `tipo`, `status`, `categoria` exata case-insensitive, `pedidoId`, `clienteId`, `de`/`ate` sobre `dataTransacao`; sort default `dataTransacao,desc`; `@EntityGraph` pedido/cliente evita N+1). Vínculos opcionais a pedido e cliente; **cliente omitido com pedido informado herda o cliente do pedido** (POST e PUT).
+- **Ciclo de vida** (`PATCH /{id}/status`): PENDENTE→PAGA|CANCELADA, PAGA→PENDENTE (estorno da baixa); CANCELADA é terminal; demais → 400. Cadastro com status CANCELADA → 400 (status omitido assume PENDENTE; o mapper ignora `status` e o service aplica). **PUT e DELETE só em PENDENTE** — paga/cancelada preserva histórico (cancelar em vez de excluir); DELETE é físico.
+- **Faturamento de pedidos** (`financial/service/OrderBillingService`): `POST /orders/{id}/faturar` (só ADMINISTRADOR/FINANCEIRO) exige pedido CONCLUIDO ou ENTREGUE e cria receita PENDENTE (categoria "Vendas", valor = `valorTotal`, data = entrega realizada ?? hoje, vínculos pedido+cliente); pedido já com receita não cancelada → **409**; pedido sem valor → 400. **Entrega automática**: `OrderService.alterarStatus(ENTREGUE)` chama `gerarReceitaSeNecessario` — silencioso se já faturado ou sem valor (receita CANCELADA libera refaturamento — checagem `existsByPedidoIdAndTipoAndStatusNot`).
+- **Resumos** (`FinancialQueryRepository`, SQL nativo no padrão do dashboard): `GET /financial/resumo?de&ate` (default mês corrente UTC; CANCELADAS fora) → receitas/despesas pagas e pendentes, `saldoRealizado` (pagas) e `saldoPrevisto` (pagas+pendentes); `de` > `ate` → 400. `GET /financial/resumo/mensal?meses=` (1–60, `Math.clamp`) → série só de transações **PAGAS**, N meses completos zerados em ordem cronológica (padrão das séries do dashboard).
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -254,5 +261,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 15 — Financeiro**: módulo `financial/` (`FinancialTransaction`, tabela `transacoes_financeiras` da V9 — conferir colunas/CHECKs na migração antes de codar: tipo RECEITA/DESPESA, status, categoria, pedido vinculado etc.). Escopo sugerido: CRUD em `/financial/transactions` no padrão dos módulos (filtros: busca descrição, `tipo`, `status`, `categoria`, `pedidoId`, período); regras de status (ex.: PENDENTE→PAGA/CANCELADA — ver CHECK da V9); **integração com pedidos**: gerar receita PENDENTE automaticamente quando o pedido é ENTREGUE (ou endpoint de faturamento manual `POST /orders/{id}/faturar` — decidir com o usuário); resumo financeiro `GET /financial/resumo` (receitas × despesas × saldo por período/mês, complementando o dashboard). Perfis: ADMINISTRADOR e FINANCEIRO gerenciam; OPERADOR/VISUALIZADOR consultam? — confirmar com o usuário, pois difere do padrão dos demais módulos. Upload de STL/3MF continua adiado.)
+3. Implementar a próxima etapa pendente (**Etapa 16 — Relatórios (PDF)**: módulo `report/`. Escopo sugerido: geração de PDF (escolher lib com o usuário — OpenPDF/iText vs JasperReports vs flying-saucer+HTML) para relatórios de pedidos, financeiro (transações do período + resumo) e consumo de filamento; endpoints `GET /reports/...` com filtros de período, resposta `application/pdf` com `Content-Disposition` (header já exposto no CORS); reusar as agregações de `dashboard/` e `financial/` onde possível. Perfis: definir com o usuário (relatório financeiro provavelmente restrito a ADMINISTRADOR/FINANCEIRO). Upload de STL/3MF continua adiado.)
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
