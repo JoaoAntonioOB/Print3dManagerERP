@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-16** (fim da Etapa 16).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-16** (Etapa 17 iniciada — parte 1 concluída).
 
 ---
 
@@ -105,7 +105,7 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 14 | Dashboard (gráficos + indicadores) | ✅ Concluída (17 cenários E2E via HTTP real) |
 | 15 | Financeiro | ✅ Concluída (38 cenários E2E via HTTP real) |
 | 16 | Relatórios (PDF) | ✅ Concluída (13 cenários E2E via HTTP real) |
-| 17 | Frontend React | ⬜ **PRÓXIMA** |
+| 17 | Frontend React | 🔄 **EM ANDAMENTO** (parte 1 ✅: setup, login/refresh, layout, dashboard inicial — validada em browser real) |
 | 18 | Testes (JUnit, Mockito, integração) | ⬜ |
 | 19 | Melhorias finais (rate limit, etc.) | ⬜ |
 
@@ -243,6 +243,15 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - `ReportQueryRepository` com SQL nativo (padrão do dashboard); datas formatadas no próprio SQL (`to_char DD/MM/YYYY`) para não depender do mapeamento de tipos do Hibernate em query nativa; moeda formatada em pt-BR no service.
 - **Handler global ganhou `MethodArgumentTypeMismatchException` → 400** (enum/tipo inválido em query param dava 500 em TODOS os módulos; mensagem lista os valores aceitos quando o alvo é enum).
 
+### Frontend React (Etapa 17 — parte 1)
+- Projeto Vite (react-ts) criado em `frontend/` preservando Dockerfile/nginx.conf; estrutura em `src/`: `api/` (Axios + tipos), `auth/` (AuthProvider + RequireAuth + localStorage), `layout/` (AppLayout), `pages/`, `theme.ts` (azul-petróleo #34495e, mesmo dos PDFs; locale ptBR). Detalhes de uso no `frontend/README.md`.
+- **Auth**: tokens em localStorage; interceptor Axios anexa Bearer e, em 401 (fora de `/auth/*`), renova via `/auth/refresh` com **uma promise compartilhada** (concorrentes aguardam a mesma renovação) e reexecuta a chamada; refresh falhou → limpa sessão, evento `print3d:sessao-expirada`, toast e volta ao login. Logout chama `POST /auth/logout` com o refresh token.
+- **Rotas**: `/login` pública; demais dentro de `<RequireAuth><AppLayout/></RequireAuth>` (redirect guarda o destino em `state.de`). Menu lateral filtrado por `role` (Usuários só ADMINISTRADOR); páginas placeholder para os módulos ainda sem tela; Dashboard inicial com cards de `/dashboard/resumo` via TanStack Query.
+- **Proxy dev** (`vite.config.ts`): `/api` → `localhost:8080` **removendo o header Origin** — sem isso o backend do Docker (CORS `http://localhost`) responde 403 "Invalid CORS request" ao Origin `http://localhost:5173`. Em produção o NGINX já faz proxy same-origin.
+- **Gotchas da stack 2026**: MUI **v9** não aceita system props direto no componente (`fontWeight`, `alignItems`, `flexWrap` → sempre via `sx`); zod **v4** usa `z.email()` (não `z.string().email()`); scaffold Vite usa oxlint (`npm run lint`).
+- **Validação**: `npm run build` (tsc + vite) e lint verdes; fluxo completo dirigido em browser real (playwright-core + Edge headless, script no scratchpad): login → erro de credencial → dashboard com dados → navegação → F5 mantém sessão → logout.
+- **Pendente nas próximas partes**: telas CRUD dos módulos (pedidos, orçamentos, clientes, filamentos, estoque, impressoras, impressões, financeiro, usuários), gráficos Recharts no dashboard, downloads dos relatórios PDF, e descomentar o serviço `frontend` no docker-compose ao final.
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -268,5 +277,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Implementar a próxima etapa pendente (**Etapa 17 — Frontend React**: criar o projeto Vite em `frontend/` (React 19 + TypeScript; React Router, Axios, TanStack Query, React Hook Form, Zod, MUI, Recharts, React Hot Toast — stack da seção 2). Base já pronta: `frontend/Dockerfile` (Node 22 → NGINX) e `nginx.conf` (SPA + proxy `/api`) — descomentar o serviço `frontend` no `docker-compose.yml`; CORS do backend já libera `http://localhost:5173`. Escopo grande — combinar com o usuário por onde começar (sugestão: setup + login/refresh com interceptor Axios + layout com menu por perfil; depois telas módulo a módulo na ordem do backend). Toda a API está documentada no Swagger (`/api/swagger-ui.html`); séries do dashboard/financeiro já vêm prontas para Recharts; relatórios são downloads `application/pdf`. Upload de STL/3MF continua adiado.)
+3. Continuar a **Etapa 17 — Frontend React** (parte 1 pronta: setup, auth, layout, dashboard inicial — ver seção "Frontend React (Etapa 17 — parte 1)"). Próximas partes, a combinar a ordem com o usuário: telas CRUD módulo a módulo (sugestão: Clientes primeiro — CRUD mais simples e padrão para os demais —, depois Filamentos/Estoque/Impressoras, Pedidos, Orçamentos, Financeiro, Usuários), gráficos Recharts no dashboard (séries `/dashboard/*` e `/financial/resumo/mensal` já vêm prontas), tela de Relatórios (download dos PDFs com blob + `Content-Disposition`), e por fim descomentar o serviço `frontend` no docker-compose e validar o build NGINX. Toda a API está no Swagger (`/api/swagger-ui.html`). Upload de STL/3MF continua adiado.
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
