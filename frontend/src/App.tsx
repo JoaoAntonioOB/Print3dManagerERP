@@ -3,6 +3,7 @@ import { RequireAuth } from './auth/RequireAuth';
 import { ClientsPage } from './pages/clients/ClientsPage';
 import { FilamentsPage } from './pages/filaments/FilamentsPage';
 import { InventoryPage } from './pages/inventory/InventoryPage';
+import { OrdersPage } from './pages/orders/OrdersPage';
 import { PrintersPage } from './pages/printers/PrintersPage';
 import { AppLayout } from './layout/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
@@ -21,7 +22,7 @@ export function App() {
         }
       >
         <Route index element={<DashboardPage />} />
-        <Route path="pedidos" element={<PlaceholderPage titulo="Pedidos" />} />
+        <Route path="pedidos" element={<OrdersPage />} />
         <Route path="orcamentos" element={<PlaceholderPage titulo="Orçamentos" />} />
         <Route path="clientes" element={<ClientsPage />} />
         <Route path="filamentos" element={<FilamentsPage />} />

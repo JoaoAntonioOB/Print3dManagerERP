@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-16** (Etapa 17 iniciada — parte 1 concluída).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-17** (Etapa 17 — partes 1 a 6 concluídas; próxima parte: Orçamentos, ver seção do Frontend).
 
 ---
 
@@ -105,7 +105,7 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 14 | Dashboard (gráficos + indicadores) | ✅ Concluída (17 cenários E2E via HTTP real) |
 | 15 | Financeiro | ✅ Concluída (38 cenários E2E via HTTP real) |
 | 16 | Relatórios (PDF) | ✅ Concluída (13 cenários E2E via HTTP real) |
-| 17 | Frontend React | 🔄 **EM ANDAMENTO** (parte 1 ✅: setup, login/refresh, layout, dashboard inicial — validada em browser real) |
+| 17 | Frontend React | 🔄 **EM ANDAMENTO** (✅ partes 1–6: setup+auth+layout+dashboard, Clientes, Filamentos, Estoque, Impressoras, Pedidos — todas validadas em browser real; próxima parte: Orçamentos) |
 | 18 | Testes (JUnit, Mockito, integração) | ⬜ |
 | 19 | Melhorias finais (rate limit, etc.) | ⬜ |
 
@@ -243,6 +243,18 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - `ReportQueryRepository` com SQL nativo (padrão do dashboard); datas formatadas no próprio SQL (`to_char DD/MM/YYYY`) para não depender do mapeamento de tipos do Hibernate em query nativa; moeda formatada em pt-BR no service.
 - **Handler global ganhou `MethodArgumentTypeMismatchException` → 400** (enum/tipo inválido em query param dava 500 em TODOS os módulos; mensagem lista os valores aceitos quando o alvo é enum).
 
+### Frontend React (Etapa 17 — progresso)
+
+**Concluídas e commitadas (validadas de ponta a ponta em browser real — scripts playwright-core + Edge headless):**
+- **Parte 2 — Clientes** (`pages/clients/`): o CRUD **modelo** dos demais — toolbar de filtros (busca com `useDebounce`, selects nativos), tabela paginada server-side (`TablePagination`), form em Dialog (RHF+zod, grid responsivo), soft delete com `ConfirmDialog` + reativação, botões de escrita escondidos de quem não gerencia (`podeGerenciar` por role). Componentes compartilhados criados: `components/ConfirmDialog`, `hooks/useDebounce`.
+- **Parte 3 — Filamentos** (`pages/filaments/`): + diálogo de movimentação de estoque em gramas; destaque visual de estoque baixo; filtro "só estoque baixo"; **`lib/form.ts`** criado (campos numéricos como texto pt-BR — aceita vírgula —, helpers `decimalObrigatorio/decimalOpcional/inteiroOpcional/paraNumero/paraCampo/paraTexto`). Estoque inicial só no cadastro (PUT não envia quantidade).
+- **Parte 4 — Estoque de insumos** (`pages/inventory/`): espelho de Filamentos na unidade de medida do item.
+- **Parte 5 — Impressoras** (`pages/printers/`): CRUD + diálogo de status operacional + **configurações de custo** (`PrinterConfigDialog` serve global e por-impressora: mostra origem PRÓPRIA/“Herdada da global”, salvar própria, remover própria; escrita só ADMINISTRADOR — refletido na UI).
+
+- **Parte 6 — Pedidos** (`pages/orders/`): `api/orders.ts` (tipos + `TRANSICOES_PEDIDO` espelhando a máquina de estados do backend), `OrdersPage.tsx` (listagem com ações: ver/editar, status, **faturar** com confirmação — só ADMIN/FINANCEIRO e CONCLUIDO/ENTREGUE —, excluir só PENDENTE), `OrderStatusDialog.tsx` (só transições válidas), `OrderFormDialog.tsx` (cliente via Autocomplete com busca remota, itens com `useFieldArray`, total calculado ao vivo; vira **somente leitura** quando status ≠ PENDENTE). **Gotcha zod+RHF resolvido**: `.refine` no `clienteId` faz input≠output no zod — tipar `useForm<z.input<...>, unknown, z.output<...>>` e o handler/`paraPayload` recebem o output (clienteId já `number`). **Gotcha playwright+MUI**: o Tooltip clona `aria-label` para o span wrapper — asserts de `disabled` precisam do prefixo `button[aria-label=...]`; e o Drawer do menu também é `role=dialog` (não esperar "dialog detached" genérico). Validado ponta a ponta (`drive-pedidos.mjs`): criar (validação zod, 2º item removido, total ao vivo), editar, PENDENTE→EM_PRODUCAO→CONCLUIDO→faturar→ENTREGUE, leitura em ENTREGUE, excluir PENDENTE, filtro por status.
+
+**Partes restantes da etapa (ordem combinada com o usuário):** Orçamentos (ciclo RASCUNHO→…→CONVERTIDO + conversão em pedido; link público já existe no backend), Impressões (jobs: iniciar/concluir/falhar/cancelar), Financeiro (transações + resumo), Usuários (só ADMIN), gráficos Recharts no dashboard (séries `/dashboard/*` e `/financial/resumo/mensal` já prontas), tela de Relatórios (download blob dos PDFs), e por fim descomentar o serviço `frontend` no docker-compose e validar o build NGINX.
+
 ### Frontend React (Etapa 17 — parte 1)
 - Projeto Vite (react-ts) criado em `frontend/` preservando Dockerfile/nginx.conf; estrutura em `src/`: `api/` (Axios + tipos), `auth/` (AuthProvider + RequireAuth + localStorage), `layout/` (AppLayout), `pages/`, `theme.ts` (azul-petróleo #34495e, mesmo dos PDFs; locale ptBR). Detalhes de uso no `frontend/README.md`.
 - **Auth**: tokens em localStorage; interceptor Axios anexa Bearer e, em 401 (fora de `/auth/*`), renova via `/auth/refresh` com **uma promise compartilhada** (concorrentes aguardam a mesma renovação) e reexecuta a chamada; refresh falhou → limpa sessão, evento `print3d:sessao-expirada`, toast e volta ao login. Logout chama `POST /auth/logout` com o refresh token.
@@ -277,5 +289,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Continuar a **Etapa 17 — Frontend React** (parte 1 pronta: setup, auth, layout, dashboard inicial — ver seção "Frontend React (Etapa 17 — parte 1)"). Próximas partes, a combinar a ordem com o usuário: telas CRUD módulo a módulo (sugestão: Clientes primeiro — CRUD mais simples e padrão para os demais —, depois Filamentos/Estoque/Impressoras, Pedidos, Orçamentos, Financeiro, Usuários), gráficos Recharts no dashboard (séries `/dashboard/*` e `/financial/resumo/mensal` já vêm prontas), tela de Relatórios (download dos PDFs com blob + `Content-Disposition`), e por fim descomentar o serviço `frontend` no docker-compose e validar o build NGINX. Toda a API está no Swagger (`/api/swagger-ui.html`). Upload de STL/3MF continua adiado.
+3. Continuar a **Etapa 17 — Frontend React** na próxima parte: **Orçamentos** (ciclo RASCUNHO→…→CONVERTIDO + conversão em pedido; endpoints da Etapa 13, link público já existe no backend). Fluxo de trabalho estabelecido por tela: conferir DTOs do backend → escrever api/página/dialogs → `npm run build` + lint → validar em browser real (padrão dos scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge; backend via `docker compose up -d` e `npm run dev` em `frontend/`) → commit por parte. Toda a API está no Swagger (`/api/swagger-ui.html`). Upload de STL/3MF continua adiado.
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
