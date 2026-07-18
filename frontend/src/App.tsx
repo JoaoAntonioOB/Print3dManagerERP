@@ -8,12 +8,12 @@ import { OrdersPage } from './pages/orders/OrdersPage';
 import { PrintersPage } from './pages/printers/PrintersPage';
 import { PrintsPage } from './pages/prints/PrintsPage';
 import { PublicQuotePage } from './pages/quotes/PublicQuotePage';
+import { ReportsPage } from './pages/reports/ReportsPage';
 import { UsersPage } from './pages/users/UsersPage';
 import { QuotesPage } from './pages/quotes/QuotesPage';
 import { AppLayout } from './layout/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
-import { PlaceholderPage } from './pages/PlaceholderPage';
 
 export function App() {
   return (
@@ -36,7 +36,7 @@ export function App() {
         <Route path="impressoras" element={<PrintersPage />} />
         <Route path="impressoes" element={<PrintsPage />} />
         <Route path="financeiro" element={<FinancialPage />} />
-        <Route path="relatorios" element={<PlaceholderPage titulo="Relatórios" />} />
+        <Route path="relatorios" element={<ReportsPage />} />
         <Route path="usuarios" element={<UsersPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-17** (Etapa 17 — partes 1 a 11 concluídas; próximas partes: Relatórios e docker-compose — ver seção do Frontend).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-17** (Etapa 17 — partes 1 a 12 concluídas; última parte: docker-compose/NGINX — ver seção do Frontend).
 
 ---
 
@@ -105,7 +105,7 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 14 | Dashboard (gráficos + indicadores) | ✅ Concluída (17 cenários E2E via HTTP real) |
 | 15 | Financeiro | ✅ Concluída (38 cenários E2E via HTTP real) |
 | 16 | Relatórios (PDF) | ✅ Concluída (13 cenários E2E via HTTP real) |
-| 17 | Frontend React | 🔄 **EM ANDAMENTO** (✅ partes 1–11: setup+auth+layout+dashboard com gráficos, Clientes, Filamentos, Estoque, Impressoras, Pedidos, Orçamentos, Impressões, Financeiro, Usuários — todas validadas em browser real; restam: Relatórios e docker-compose) |
+| 17 | Frontend React | 🔄 **EM ANDAMENTO** (✅ partes 1–12: todas as telas prontas e validadas em browser real, incluindo gráficos e Relatórios; última parte: docker-compose/NGINX) |
 | 18 | Testes (JUnit, Mockito, integração) | ⬜ |
 | 19 | Melhorias finais (rate limit, etc.) | ⬜ |
 
@@ -263,7 +263,9 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 - **Parte 11 — Gráficos do dashboard** (`api/dashboard.ts` + `DashboardPage.tsx` reescrita): mantém os 4 cards e adiciona 5 gráficos Recharts + 1 stat tile — faturamento mensal (barras), pedidos abertos por mês (linha), receitas × despesas pagas (barras agrupadas com legenda), consumo de filamento (barras), top 5 clientes (barras horizontais), taxa de sucesso como número-manchete com chips (um valor único não é gráfico). **Paleta validada com a skill dataviz** (`validate_palette.js`): azul `#3572b0` (séries únicas/receitas) + laranja `#c8611a` (despesas) — o azul-petróleo do tema (#34495e) REPROVA como cor de dado (escuro/acinzentado demais). Regras seguidas: nunca eixo duplo (pedidos e faturamento viraram 2 gráficos), barras finas com topo arredondado, grid recessivo, tooltips nativos. Gotcha Recharts v3+TS: `labelFormatter` recebe `ReactNode` — envolver com `String()`.
 
-**Partes restantes da etapa (ordem combinada com o usuário):** tela de Relatórios (download blob dos PDFs), e por fim descomentar o serviço `frontend` no docker-compose e validar o build NGINX.
+- **Parte 12 — Relatórios** (`pages/reports/ReportsPage.tsx` + `api/reports.ts`): período compartilhado (default mês corrente) + 3 cards de download; card Financeiro só aparece para ADMINISTRADOR/FINANCEIRO; relatório de pedidos tem filtro opcional de status; `de > ate` barrado no cliente com toast. Download via axios `responseType: 'blob'` + `<a download>` com nome extraído do `Content-Disposition` (o CORS do backend já expõe o header). `PlaceholderPage` removida — todas as rotas têm tela real.
+
+**Parte restante:** descomentar o serviço `frontend` no docker-compose e validar o build NGINX.
 
 ### Frontend React (Etapa 17 — parte 1)
 - Projeto Vite (react-ts) criado em `frontend/` preservando Dockerfile/nginx.conf; estrutura em `src/`: `api/` (Axios + tipos), `auth/` (AuthProvider + RequireAuth + localStorage), `layout/` (AppLayout), `pages/`, `theme.ts` (azul-petróleo #34495e, mesmo dos PDFs; locale ptBR). Detalhes de uso no `frontend/README.md`.
