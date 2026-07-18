@@ -5,6 +5,8 @@ import { FilamentsPage } from './pages/filaments/FilamentsPage';
 import { InventoryPage } from './pages/inventory/InventoryPage';
 import { OrdersPage } from './pages/orders/OrdersPage';
 import { PrintersPage } from './pages/printers/PrintersPage';
+import { PublicQuotePage } from './pages/quotes/PublicQuotePage';
+import { QuotesPage } from './pages/quotes/QuotesPage';
 import { AppLayout } from './layout/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
@@ -14,6 +16,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/orcamento/:shareToken" element={<PublicQuotePage />} />
       <Route
         element={
           <RequireAuth>
@@ -23,7 +26,7 @@ export function App() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="pedidos" element={<OrdersPage />} />
-        <Route path="orcamentos" element={<PlaceholderPage titulo="Orçamentos" />} />
+        <Route path="orcamentos" element={<QuotesPage />} />
         <Route path="clientes" element={<ClientsPage />} />
         <Route path="filamentos" element={<FilamentsPage />} />
         <Route path="estoque" element={<InventoryPage />} />

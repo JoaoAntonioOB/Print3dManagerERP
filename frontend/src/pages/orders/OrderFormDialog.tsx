@@ -88,7 +88,8 @@ function paraFormulario(pedido: Pedido): DadosFormulario {
     observacoes: pedido.observacoes ?? '',
     itens: pedido.itens.map((item) => ({
       id: item.id,
-      filamentoId: item.filamentoId !== null ? String(item.filamentoId) : '',
+      // != null: o backend omite campos nulos do JSON (non_null).
+      filamentoId: item.filamentoId != null ? String(item.filamentoId) : '',
       nomePeca: item.nomePeca,
       descricao: item.descricao ?? '',
       quantidade: String(item.quantidade),
@@ -130,6 +131,9 @@ interface OrderFormDialogProps {
 export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogProps) {
   const queryClient = useQueryClient();
   const [buscaCliente, setBuscaCliente] = useState('');
+  // Objeto do Autocomplete em estado próprio: derivá-lo da query faz o value
+  // oscilar para null durante o refetch e o MUI entra em loop de re-render.
+  const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
 
   const { data: pedido, isPending: carregandoPedido } = useQuery({
     queryKey: ['orders', 'detalhe', pedidoId],
@@ -146,6 +150,7 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
     queryFn: () =>
       clientsApi.listar({ busca: buscaCliente, ativo: true, page: 0, size: 20 }),
     enabled: aberto,
+    placeholderData: (anterior) => anterior,
   });
 
   const { data: filamentos } = useQuery({
@@ -169,7 +174,11 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
 
   useEffect(() => {
     if (aberto) {
-      reset(pedido && pedidoId !== null ? paraFormulario(pedido) : FORMULARIO_VAZIO);
+      const edicao = pedido && pedidoId !== null;
+      reset(edicao ? paraFormulario(pedido) : FORMULARIO_VAZIO);
+      setClienteSelecionado(
+        edicao ? ({ id: pedido.clienteId, nome: pedido.clienteNome } as Cliente) : null,
+      );
     }
   }, [aberto, pedido, pedidoId, reset]);
 
@@ -196,12 +205,6 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
     return soma + quantidade * preco;
   }, 0);
   const total = Math.max(subtotal - desconto, 0);
-
-  const clienteSelecionado =
-    clientes?.content.find((c) => c.id === watch('clienteId')) ??
-    (pedido && pedido.clienteId === watch('clienteId')
-      ? ({ id: pedido.clienteId, nome: pedido.clienteNome } as Cliente)
-      : null);
 
   const titulo =
     pedidoId === null
@@ -237,7 +240,10 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
                       getOptionLabel={(opcao) => opcao.nome}
                       isOptionEqualToValue={(opcao, valor) => opcao.id === valor.id}
                       value={clienteSelecionado}
-                      onChange={(_, novo) => field.onChange(novo ? novo.id : null)}
+                      onChange={(_, novo) => {
+                        field.onChange(novo ? novo.id : null);
+                        setClienteSelecionado(novo);
+                      }}
                       onInputChange={(_, texto) => setBuscaCliente(texto)}
                       disabled={somenteLeitura}
                       noOptionsText="Nenhum cliente encontrado"
