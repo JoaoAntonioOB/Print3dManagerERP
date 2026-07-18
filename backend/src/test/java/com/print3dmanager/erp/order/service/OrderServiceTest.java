@@ -52,6 +52,8 @@ class OrderServiceTest {
     @Mock
     private OrderBillingService orderBillingService;
     @Mock
+    private OrderItemFileService orderItemFileService;
+    @Mock
     private OrderMapper orderMapper;
 
     @InjectMocks
@@ -265,16 +267,37 @@ class OrderServiceTest {
                 .hasMessageContaining("não pertence");
     }
 
+    @Test
+    @DisplayName("atualizar: arquivo de modelo do item removido é apagado do armazenamento")
+    void atualizarLimpaArquivoDoItemRemovido() {
+        Order pedido = pedidoComStatus(OrderStatus.PENDENTE);
+        OrderItem removido = itemExistente(2L, "Peça com modelo", 1, "10.00");
+        removido.setArquivoModelo("modelos/abc_peca.stl");
+        pedido.adicionarItem(removido);
+        when(orderRepository.findDetalhadoById(5L)).thenReturn(Optional.of(pedido));
+        stubClienteAtivo(1L);
+        stubMapperDeItens();
+
+        service.atualizar(5L, atualizacaoSimples());
+
+        verify(orderItemFileService).removerArquivoFisico("modelos/abc_peca.stl");
+        assertThat(pedido.getItens()).noneMatch(item -> item.getId() != null);
+    }
+
     // ===== exclusão =====
 
     @Test
-    @DisplayName("excluir: pedido PENDENTE é removido fisicamente")
+    @DisplayName("excluir: pedido PENDENTE é removido fisicamente junto com os arquivos de modelo")
     void excluirPendente() {
         Order pedido = pedidoComStatus(OrderStatus.PENDENTE);
+        OrderItem item = itemExistente(1L, "Peça", 1, "10.00");
+        item.setArquivoModelo("modelos/abc_peca.stl");
+        pedido.adicionarItem(item);
         when(orderRepository.findById(5L)).thenReturn(Optional.of(pedido));
 
         service.excluir(5L);
 
+        verify(orderItemFileService).removerArquivoFisico("modelos/abc_peca.stl");
         verify(orderRepository).delete(pedido);
     }
 

@@ -57,6 +57,7 @@ public class OrderService {
     private final FilamentRepository filamentRepository;
     private final UserRepository userRepository;
     private final OrderBillingService orderBillingService;
+    private final OrderItemFileService orderItemFileService;
     private final OrderMapper orderMapper;
 
     @Transactional(readOnly = true)
@@ -139,6 +140,8 @@ public class OrderService {
                     "Somente pedidos PENDENTES podem ser excluídos — cancele o pedido "
                             + "para preservar o histórico.");
         }
+        pedido.getItens().forEach(
+                item -> orderItemFileService.removerArquivoFisico(item.getArquivoModelo()));
         orderRepository.delete(pedido);
     }
 
@@ -154,7 +157,13 @@ public class OrderService {
                 .map(OrderItemRequest::id)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        pedido.getItens().removeIf(item -> !idsRecebidos.contains(item.getId()));
+        pedido.getItens().removeIf(item -> {
+            boolean remover = !idsRecebidos.contains(item.getId());
+            if (remover) {
+                orderItemFileService.removerArquivoFisico(item.getArquivoModelo());
+            }
+            return remover;
+        });
 
         requests.forEach(itemRequest -> {
             if (itemRequest.id() == null) {

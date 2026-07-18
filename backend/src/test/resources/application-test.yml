@@ -1,5 +1,9 @@
 # Perfil de teste: o DataSource vem do Testcontainers (@ServiceConnection);
-# aqui só reduzimos o ruído de log em relação ao perfil dev.
+# uploads vão para target/ (limpo pelo mvn clean) e o log fica mais quieto.
+application:
+  storage:
+    upload-dir: target/test-uploads
+
 logging:
   level:
     com.print3dmanager.erp: INFO
