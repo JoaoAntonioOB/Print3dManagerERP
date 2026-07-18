@@ -1,3 +1,4 @@
+import { dispararDownloadBlob, nomeDoContentDisposition } from '../lib/download';
 import { api } from './client';
 import type { OrderStatus } from './orders';
 
@@ -28,17 +29,10 @@ export async function baixarRelatorio(
     },
   });
 
-  const disposition = (headers['content-disposition'] as string | undefined) ?? '';
-  const nome =
-    /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? `relatorio-${tipo}.pdf`;
-
-  const url = URL.createObjectURL(data);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = nome;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  const nome = nomeDoContentDisposition(
+    headers['content-disposition'] as string | undefined,
+    `relatorio-${tipo}.pdf`,
+  );
+  dispararDownloadBlob(data, nome);
   return nome;
 }

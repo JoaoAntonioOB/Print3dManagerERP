@@ -1,3 +1,4 @@
+import { dispararDownloadBlob, nomeDoContentDisposition } from '../lib/download';
 import { api } from './client';
 import type { PageResponse } from './types';
 
@@ -61,6 +62,15 @@ export interface ItemPedido {
   tempoImpressaoMinutos: number | null;
   precoUnitario: number;
   subtotal: number;
+  /** Caminho no armazenamento (modelos/<uuid>_<nome>); omitido quando não há arquivo. */
+  arquivoModelo?: string | null;
+}
+
+/** Nome amigável do arquivo de modelo: remove o diretório e o prefixo UUID. */
+export function nomeDoArquivoModelo(caminho: string): string {
+  const nome = caminho.slice(caminho.lastIndexOf('/') + 1);
+  const separador = nome.indexOf('_');
+  return separador < 0 ? nome : nome.slice(separador + 1);
 }
 
 export interface Pedido extends Omit<PedidoResumo, never> {
@@ -145,5 +155,40 @@ export const ordersApi = {
   async faturar(id: number): Promise<TransacaoFinanceira> {
     const { data } = await api.post<TransacaoFinanceira>(`/orders/${id}/faturar`);
     return data;
+  },
+
+  /** Anexa (ou substitui) o modelo 3D do item — só pedidos PENDENTES. */
+  async anexarArquivoItem(
+    pedidoId: number,
+    itemId: number,
+    arquivo: File,
+  ): Promise<ItemPedido> {
+    const form = new FormData();
+    form.append('arquivo', arquivo);
+    const { data } = await api.post<ItemPedido>(
+      `/orders/${pedidoId}/itens/${itemId}/arquivo`,
+      form,
+    );
+    return data;
+  },
+
+  /** Baixa o modelo 3D do item com o nome vindo do Content-Disposition. */
+  async baixarArquivoItem(pedidoId: number, itemId: number): Promise<void> {
+    const { data, headers } = await api.get<Blob>(
+      `/orders/${pedidoId}/itens/${itemId}/arquivo`,
+      { responseType: 'blob' },
+    );
+    dispararDownloadBlob(
+      data,
+      nomeDoContentDisposition(
+        headers['content-disposition'] as string | undefined,
+        'modelo.stl',
+      ),
+    );
+  },
+
+  /** Remove o modelo 3D do item — só pedidos PENDENTES. */
+  async removerArquivoItem(pedidoId: number, itemId: number): Promise<void> {
+    await api.delete(`/orders/${pedidoId}/itens/${itemId}/arquivo`);
   },
 };

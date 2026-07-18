@@ -24,8 +24,6 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.charset.StandardCharsets;
-
 /**
  * Arquivo de modelo 3D (STL/3MF) de um item de pedido. Mesmos perfis do
  * módulo de pedidos: ADMINISTRADOR e OPERADOR anexam/removem (pedido
@@ -68,8 +66,10 @@ public class OrderItemFileController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(download.contentType()))
                 .contentLength(download.tamanhoBytes())
+                // Sem charset: o nome já é ASCII puro (sanitizado no upload) e o
+                // charset UTF-8 faria o Spring emitir encoded-word RFC 2047.
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                        .filename(download.nomeArquivo(), StandardCharsets.UTF_8)
+                        .filename(download.nomeArquivo())
                         .build().toString())
                 .body(download.recurso());
     }

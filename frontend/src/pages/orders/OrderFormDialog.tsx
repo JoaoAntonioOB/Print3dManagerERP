@@ -1,6 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import {
   Autocomplete,
   Box,
@@ -17,14 +20,19 @@ import {
   Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { z } from 'zod';
 import { mensagemDeErro } from '../../api/client';
 import { clientsApi, type Cliente } from '../../api/clients';
 import { filamentsApi } from '../../api/filaments';
-import { ordersApi, type Pedido, type PedidoInput } from '../../api/orders';
+import {
+  nomeDoArquivoModelo,
+  ordersApi,
+  type Pedido,
+  type PedidoInput,
+} from '../../api/orders';
 import {
   decimalObrigatorio,
   decimalOpcional,
@@ -134,6 +142,10 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
   // Objeto do Autocomplete em estado próprio: derivá-lo da query faz o value
   // oscilar para null durante o refetch e o MUI entra em loop de re-render.
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(null);
+  // Arquivo de modelo por id de item, fora do react-hook-form: invalidar a
+  // query do pedido para refletir o anexo dispararia o reset() e descartaria
+  // edições não salvas dos demais campos.
+  const [arquivos, setArquivos] = useState<Record<number, string | undefined>>({});
 
   const { data: pedido, isPending: carregandoPedido } = useQuery({
     queryKey: ['orders', 'detalhe', pedidoId],
@@ -179,6 +191,13 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
       setClienteSelecionado(
         edicao ? ({ id: pedido.clienteId, nome: pedido.clienteNome } as Cliente) : null,
       );
+      setArquivos(
+        edicao
+          ? Object.fromEntries(
+              pedido.itens.map((item) => [item.id, item.arquivoModelo ?? undefined]),
+            )
+          : {},
+      );
     }
   }, [aberto, pedido, pedidoId, reset]);
 
@@ -196,6 +215,45 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
     },
     onError: (erro) => toast.error(mensagemDeErro(erro)),
   });
+
+  const anexarArquivo = useMutation({
+    mutationFn: ({ itemId, arquivo }: { itemId: number; arquivo: File }) =>
+      ordersApi.anexarArquivoItem(pedidoId!, itemId, arquivo),
+    onSuccess: (item) => {
+      toast.success('Modelo 3D anexado.');
+      setArquivos((atual) => ({ ...atual, [item.id]: item.arquivoModelo ?? undefined }));
+    },
+    onError: (erro) => toast.error(mensagemDeErro(erro)),
+  });
+
+  const removerArquivo = useMutation({
+    mutationFn: (itemId: number) => ordersApi.removerArquivoItem(pedidoId!, itemId),
+    onSuccess: (_, itemId) => {
+      toast.success('Modelo 3D removido.');
+      setArquivos((atual) => ({ ...atual, [itemId]: undefined }));
+    },
+    onError: (erro) => toast.error(mensagemDeErro(erro)),
+  });
+
+  function aoEscolherArquivo(itemId: number, evento: ChangeEvent<HTMLInputElement>) {
+    const arquivo = evento.target.files?.[0];
+    evento.target.value = '';
+    if (!arquivo) {
+      return;
+    }
+    const nome = arquivo.name.toLowerCase();
+    if (!nome.endsWith('.stl') && !nome.endsWith('.3mf')) {
+      toast.error('Só são aceitos modelos .stl e .3mf.');
+      return;
+    }
+    anexarArquivo.mutate({ itemId, arquivo });
+  }
+
+  function baixarArquivo(itemId: number) {
+    ordersApi
+      .baixarArquivoItem(pedidoId!, itemId)
+      .catch((erro) => toast.error(mensagemDeErro(erro)));
+  }
 
   const itens = watch('itens');
   const desconto = paraNumero(watch('desconto') || '') ?? 0;
@@ -377,6 +435,82 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
                       </span>
                     </Tooltip>
                   )}
+                  {(() => {
+                      // Id real do item (o `campo.id` do useFieldArray é a key
+                      // interna do RHF, não o id do backend). Sem id (pedido ou
+                      // item ainda não salvos), só o hint de salvar antes.
+                      const itemId = itens[indice]?.id ?? null;
+                      if (itemId === null) {
+                        return somenteLeitura ? null : (
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ gridColumn: '1 / -1' }}
+                          >
+                            Modelo 3D: salve o pedido para poder anexar o arquivo.
+                          </Typography>
+                        );
+                      }
+                      const arquivo = arquivos[itemId];
+                      return (
+                        <Box
+                          sx={{
+                            gridColumn: '1 / -1',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Modelo 3D:{' '}
+                            {arquivo ? nomeDoArquivoModelo(arquivo) : 'nenhum arquivo anexado'}
+                          </Typography>
+                          {arquivo && (
+                            <Tooltip title="Baixar modelo">
+                              <IconButton
+                                size="small"
+                                aria-label="Baixar modelo"
+                                onClick={() => baixarArquivo(itemId)}
+                              >
+                                <FileDownloadIcon fontSize="inherit" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {!somenteLeitura && (
+                            <>
+                              <Tooltip title="Anexar modelo (.stl ou .3mf)">
+                                <IconButton
+                                  size="small"
+                                  component="label"
+                                  aria-label="Anexar modelo"
+                                  disabled={anexarArquivo.isPending}
+                                >
+                                  <UploadFileIcon fontSize="inherit" />
+                                  <input
+                                    hidden
+                                    type="file"
+                                    accept=".stl,.3mf"
+                                    onChange={(evento) => aoEscolherArquivo(itemId, evento)}
+                                  />
+                                </IconButton>
+                              </Tooltip>
+                              {arquivo && (
+                                <Tooltip title="Remover modelo">
+                                  <IconButton
+                                    size="small"
+                                    aria-label="Remover modelo"
+                                    onClick={() => removerArquivo.mutate(itemId)}
+                                    disabled={removerArquivo.isPending}
+                                  >
+                                    <DeleteOutlineIcon fontSize="inherit" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </>
+                          )}
+                        </Box>
+                      );
+                    })()}
                 </Box>
               ))}
 
