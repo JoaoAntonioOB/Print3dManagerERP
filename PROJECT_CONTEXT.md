@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-17** (Etapa 17 — partes 1 a 12 concluídas; última parte: docker-compose/NGINX — ver seção do Frontend).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-17** (**Etapa 17 CONCLUÍDA** — frontend completo validado inclusive via NGINX/Docker; próxima: Etapa 18 — Testes, aguardando confirmação do usuário).
 
 ---
 
@@ -105,7 +105,7 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 14 | Dashboard (gráficos + indicadores) | ✅ Concluída (17 cenários E2E via HTTP real) |
 | 15 | Financeiro | ✅ Concluída (38 cenários E2E via HTTP real) |
 | 16 | Relatórios (PDF) | ✅ Concluída (13 cenários E2E via HTTP real) |
-| 17 | Frontend React | 🔄 **EM ANDAMENTO** (✅ partes 1–12: todas as telas prontas e validadas em browser real, incluindo gráficos e Relatórios; última parte: docker-compose/NGINX) |
+| 17 | Frontend React | ✅ Concluída (13 partes — todas as telas, gráficos, relatórios e o serviço NGINX no docker-compose, tudo validado em browser real) |
 | 18 | Testes (JUnit, Mockito, integração) | ⬜ |
 | 19 | Melhorias finais (rate limit, etc.) | ⬜ |
 
@@ -265,7 +265,7 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 - **Parte 12 — Relatórios** (`pages/reports/ReportsPage.tsx` + `api/reports.ts`): período compartilhado (default mês corrente) + 3 cards de download; card Financeiro só aparece para ADMINISTRADOR/FINANCEIRO; relatório de pedidos tem filtro opcional de status; `de > ate` barrado no cliente com toast. Download via axios `responseType: 'blob'` + `<a download>` com nome extraído do `Content-Disposition` (o CORS do backend já expõe o header). `PlaceholderPage` removida — todas as rotas têm tela real.
 
-**Parte restante:** descomentar o serviço `frontend` no docker-compose e validar o build NGINX.
+- **Parte 13 — Docker/NGINX (fim da etapa)**: serviço `frontend` descomentado no `docker-compose.yml` (build multi-stage Node 22 → NGINX 1.27, porta 80). Validado em browser real contra `http://localhost`: SPA servida, login via proxy same-origin `/api`, dashboard com gráficos, F5 em rota profunda (fallback `try_files`), rota pública `/orcamento/:token`. **A stack completa sobe com `docker compose up -d`.**
 
 ### Frontend React (Etapa 17 — parte 1)
 - Projeto Vite (react-ts) criado em `frontend/` preservando Dockerfile/nginx.conf; estrutura em `src/`: `api/` (Axios + tipos), `auth/` (AuthProvider + RequireAuth + localStorage), `layout/` (AppLayout), `pages/`, `theme.ts` (azul-petróleo #34495e, mesmo dos PDFs; locale ptBR). Detalhes de uso no `frontend/README.md`.
@@ -289,7 +289,7 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 1. **Docker Desktop instalado e funcionando** — `docker compose up -d postgres` sobe o banco (container `print3d-postgres`, healthy). O projeto também já está no GitHub.
 2. **`JAVA_HOME` não está configurado** no Windows. O JDK está em `C:\Program Files\Java\jdk-21.0.10` — setar na sessão antes de rodar o `mvnw` (`$env:JAVA_HOME='C:\Program Files\Java\jdk-21.0.10'`). Recomendar configurar como variável de sistema.
 3. **Maven não está instalado** — usar sempre `.\mvnw.cmd` (Windows) dentro de `backend/`.
-4. O serviço `frontend` do `docker-compose.yml` está **comentado** — descomentar na Etapa 17.
+4. A stack completa (postgres + backend + frontend/NGINX) sobe com `docker compose up -d`; o app fica em `http://localhost` e o Swagger em `http://localhost/api/swagger-ui.html` (ou `:8080` direto).
 5. O git repo root é a **própria pasta do projeto** (`C:\repository\Print3d Manager ERP`), com remote `origin` → `github.com/JoaoAntonioOB/Print3dManagerERP`.
 6. Segredo JWT tem **default de dev** no yml/compose (base64) — em produção deve vir do `.env` (`openssl rand -base64 48`).
 7. Testes de contexto Spring reais (Testcontainers) ficam para a Etapa 18 — o teste atual é só de sanidade para o build passar sem banco.
@@ -301,5 +301,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Continuar a **Etapa 17 — Frontend React** nas partes finais: **Relatórios** (download blob dos 3 PDFs — `/reports/pedidos|financeiro|consumo-filamento`; financeiro só ADMINISTRADOR/FINANCEIRO) e por fim **descomentar o serviço `frontend` no docker-compose** e validar o build NGINX. Fluxo de trabalho estabelecido por tela: conferir DTOs do backend → escrever api/página/dialogs → `npm run build` + lint → validar em browser real (padrão dos scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge; backend via `docker compose up -d` e `npm run dev` em `frontend/`) → commit por parte. Toda a API está no Swagger (`/api/swagger-ui.html`). Upload de STL/3MF continua adiado.
+3. A próxima etapa é a **18 — Testes (JUnit, Mockito, integração com Testcontainers)** — **aguardar confirmação do usuário antes de começar**. O fluxo de validação em browser real (scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge) segue disponível para regressões. Upload de STL/3MF continua adiado. Fluxo de trabalho estabelecido por tela: conferir DTOs do backend → escrever api/página/dialogs → `npm run build` + lint → validar em browser real (padrão dos scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge; backend via `docker compose up -d` e `npm run dev` em `frontend/`) → commit por parte. Toda a API está no Swagger (`/api/swagger-ui.html`). Upload de STL/3MF continua adiado.
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.

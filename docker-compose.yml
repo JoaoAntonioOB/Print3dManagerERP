@@ -48,23 +48,18 @@ services:
     networks:
       - print3d-network
 
-  # ------------------------------------------------------------------
-  # O serviço do frontend será habilitado na Etapa 17 (Frontend React),
-  # quando o projeto Vite existir. O Dockerfile e o nginx.conf já estão
-  # prontos em ./frontend.
-  # ------------------------------------------------------------------
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: print3d-frontend
-  #   restart: unless-stopped
-  #   ports:
-  #     - "80:80"
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - print3d-network
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: print3d-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - print3d-network
 
 volumes:
   postgres-data:
