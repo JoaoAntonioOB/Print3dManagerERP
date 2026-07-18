@@ -111,6 +111,19 @@ npm run dev
 14. ✅ Dashboard
 15. ✅ Financeiro
 16. ✅ Relatórios
-17. 🔄 Frontend React (em andamento)
-18. ⬜ Testes
+17. ✅ Frontend React
+18. ✅ Testes
 19. ⬜ Melhorias finais
+
+## Testes
+
+```bash
+cd backend
+./mvnw test   # Windows: .\mvnw.cmd test
+```
+
+A suíte tem duas camadas: testes unitários (JUnit 5 + Mockito) dos serviços com
+regra de negócio e testes de integração (Testcontainers + MockMvc) que sobem um
+PostgreSQL 16 real, aplicam as migrações Flyway e exercitam os fluxos completos
+via HTTP (autenticação, pedidos e orçamentos). Os testes de integração exigem o
+Docker em execução.

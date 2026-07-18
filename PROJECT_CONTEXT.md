@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-17** (**Etapa 17 CONCLUÍDA** — frontend completo validado inclusive via NGINX/Docker; próxima: Etapa 18 — Testes, aguardando confirmação do usuário).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-18** (**Etapa 18 CONCLUÍDA** — 78 testes verdes: unitários JUnit+Mockito e integração Testcontainers+MockMvc; próxima: Etapa 19 — Melhorias finais, aguardando confirmação do usuário).
 
 ---
 
@@ -106,7 +106,7 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 15 | Financeiro | ✅ Concluída (38 cenários E2E via HTTP real) |
 | 16 | Relatórios (PDF) | ✅ Concluída (13 cenários E2E via HTTP real) |
 | 17 | Frontend React | ✅ Concluída (13 partes — todas as telas, gráficos, relatórios e o serviço NGINX no docker-compose, tudo validado em browser real) |
-| 18 | Testes (JUnit, Mockito, integração) | ⬜ |
+| 18 | Testes (JUnit, Mockito, integração) | ✅ Concluída (78 testes: 65 unitários + 13 de integração com Testcontainers) |
 | 19 | Melhorias finais (rate limit, etc.) | ⬜ |
 
 ---
@@ -276,6 +276,13 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - **Validação**: `npm run build` (tsc + vite) e lint verdes; fluxo completo dirigido em browser real (playwright-core + Edge headless, script no scratchpad): login → erro de credencial → dashboard com dados → navegação → F5 mantém sessão → logout.
 - **Pendente nas próximas partes**: telas CRUD dos módulos (pedidos, orçamentos, clientes, filamentos, estoque, impressoras, impressões, financeiro, usuários), gráficos Recharts no dashboard, downloads dos relatórios PDF, e descomentar o serviço `frontend` no docker-compose ao final.
 
+### Testes (Etapa 18 — decisões)
+- **Duas camadas** em `backend/src/test/java`:
+  - **Unitários (JUnit 5 + Mockito, 65 testes)** — services com regra de negócio, repositories/mappers mockados: `CostMarkupPricingStrategyTest` (a conta central: componentes arredondados antes da soma fecham com o preço; componentes sem dados zeram), `OrderServiceTest` (número sequencial por ano, total Σ itens − desconto, máquina de estados com terminais, mescla de itens do PUT, exclusão só PENDENTE), `PrintHistoryServiceTest` (ocupação/liberação da impressora, soma de horas, abate de estoque também em falha, custo real, estoque insuficiente reverte), `OrderBillingServiceTest` (409 de refaturamento, entrega automática silenciosa), `PrinterConfigurationServiceTest` (efetiva: própria > global > vazio), `AuthServiceTest` (rotação de refresh, replay/expirado/inativo rejeitados, logout idempotente) e `JwtServiceTest` (roundtrip, chave alheia, expirado, lixo — sempre `Optional.empty`, nunca exceção). Stubs dos mappers MapStruct reproduzem os `defaultValue` (ex.: quantidade 1).
+  - **Integração (Testcontainers + MockMvc, 13 testes)** — `testsupport/AbstractIntegrationTest`: **singleton container** PostgreSQL 16-alpine com `@ServiceConnection` e perfil `test` (`src/test/resources/application-test.yml` só abaixa o log); um único contexto Spring cacheado atende todas as classes. `Print3dManagerErpApplicationTests` valida boot + 11 migrações Flyway + admin da V11. `AbstractApiIntegrationTest` (`@AutoConfigureMockMvc`) dá `loginAdmin()`/`json()`/`bearer()` — **MockMvc não usa o context path `/api`**, as rotas são as dos controllers. Fluxos: `AuthFlowIntegrationTest` (login, rotação + replay 401, logout, 401/403 em JSON), `OrderFlowIntegrationTest` (criar→produzir→concluir→faturar 201/409→entregar sem receita duplicada; transição inválida 400; DELETE fora de PENDENTE 400), `QuoteFlowIntegrationTest` (markup herdado da config global, RASCUNHO invisível no link público, visão pública sem custos internos, aprovar/recusar, conversão 201 e recusa bloqueia conversão). Testes criam seus próprios dados com e-mails únicos (`System.nanoTime()`) — o banco é compartilhado pela suíte.
+- **Gotcha Docker 29**: o engine 29+ recusa a versão de API antiga do docker-java do Testcontainers 1.21 (npipe respondia 400 e o Testcontainers "não achava" o Docker). Resolvido fixando `api.version=1.44` via `systemPropertyVariables` do Surefire no `pom.xml` — `mvnw test` funciona sem flags.
+- `verify(repo, never()).delete(any())` é ambíguo em repositories com `JpaSpecificationExecutor` (Spring Data 3.5 tem `delete(Specification)`) — usar `delete(any(Entidade.class))`.
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -292,7 +299,7 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 4. A stack completa (postgres + backend + frontend/NGINX) sobe com `docker compose up -d`; o app fica em `http://localhost` e o Swagger em `http://localhost/api/swagger-ui.html` (ou `:8080` direto).
 5. O git repo root é a **própria pasta do projeto** (`C:\repository\Print3d Manager ERP`), com remote `origin` → `github.com/JoaoAntonioOB/Print3dManagerERP`.
 6. Segredo JWT tem **default de dev** no yml/compose (base64) — em produção deve vir do `.env` (`openssl rand -base64 48`).
-7. Testes de contexto Spring reais (Testcontainers) ficam para a Etapa 18 — o teste atual é só de sanidade para o build passar sem banco.
+7. **`mvnw test` roda a suíte completa (78 testes)** — os de integração exigem o Docker Desktop em execução (Testcontainers baixa `postgres:16-alpine` e `testcontainers/ryuk` na primeira vez). A pinagem `api.version=1.44` no Surefire cobre o Docker Engine 29+.
 8. Máquina: Windows 11, PowerShell 5.1. O terminal do usuário usa pt-BR.
 
 ---
@@ -301,5 +308,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. A próxima etapa é a **18 — Testes (JUnit, Mockito, integração com Testcontainers)** — **aguardar confirmação do usuário antes de começar**. O fluxo de validação em browser real (scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge) segue disponível para regressões. Upload de STL/3MF continua adiado. Fluxo de trabalho estabelecido por tela: conferir DTOs do backend → escrever api/página/dialogs → `npm run build` + lint → validar em browser real (padrão dos scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge; backend via `docker compose up -d` e `npm run dev` em `frontend/`) → commit por parte. Toda a API está no Swagger (`/api/swagger-ui.html`). Upload de STL/3MF continua adiado.
+3. A próxima etapa é a **19 — Melhorias finais (rate limit etc.)** — **aguardar confirmação do usuário antes de começar**. Candidatas discutidas no prompt original: rate limiting, troca da senha default do admin, upload de STL/3MF (adiado desde a Etapa 12), revisão de segurança para produção. Regressões: `mvnw test` no backend (78 testes) e o fluxo de validação em browser real (scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge) para o frontend. Toda a API está no Swagger (`/api/swagger-ui.html`).
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
