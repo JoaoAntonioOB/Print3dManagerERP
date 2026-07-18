@@ -1,0 +1,7 @@
+# Perfil de teste: o DataSource vem do Testcontainers (@ServiceConnection);
+# aqui só reduzimos o ruído de log em relação ao perfil dev.
+logging:
+  level:
+    com.print3dmanager.erp: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.security: WARN
