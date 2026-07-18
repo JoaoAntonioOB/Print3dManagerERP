@@ -4,6 +4,7 @@ import CategoryIcon from '@mui/icons-material/Category';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import GroupIcon from '@mui/icons-material/Group';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
+import KeyIcon from '@mui/icons-material/Key';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -30,6 +31,7 @@ import { useState, type ReactElement } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import type { Role } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { ChangePasswordDialog } from '../components/ChangePasswordDialog';
 
 const LARGURA_MENU = 240;
 
@@ -73,6 +75,7 @@ export function AppLayout() {
   const { usuario, logout } = useAuth();
   const navigate = useNavigate();
   const [menuAberto, setMenuAberto] = useState(false);
+  const [trocaSenhaAberta, setTrocaSenhaAberta] = useState(false);
 
   const itensVisiveis = ITENS_MENU.filter(
     (item) => usuario && item.perfis.includes(usuario.role),
@@ -150,6 +153,15 @@ export function AppLayout() {
           <Typography variant="h6" sx={{ flexGrow: 1 }} noWrap>
             Print3D Manager ERP
           </Typography>
+          <Tooltip title="Trocar minha senha">
+            <IconButton
+              color="inherit"
+              onClick={() => setTrocaSenhaAberta(true)}
+              aria-label="Trocar minha senha"
+            >
+              <KeyIcon />
+            </IconButton>
+          </Tooltip>
           <Tooltip title="Sair">
             <IconButton color="inherit" onClick={sair} aria-label="Sair">
               <LogoutIcon />
@@ -188,6 +200,15 @@ export function AppLayout() {
         <Toolbar />
         <Outlet />
       </Box>
+
+      <ChangePasswordDialog
+        aberto={trocaSenhaAberta}
+        onFechar={() => setTrocaSenhaAberta(false)}
+        onSenhaTrocada={() => {
+          setTrocaSenhaAberta(false);
+          void sair();
+        }}
+      />
     </Box>
   );
 }

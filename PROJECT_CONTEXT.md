@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-17** (Etapa 17 — partes 1 a 9 concluídas; próxima parte: Usuários, ver seção do Frontend).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-17** (Etapa 17 — partes 1 a 10 concluídas; próximas partes: gráficos Recharts no dashboard, Relatórios, docker-compose — ver seção do Frontend).
 
 ---
 
@@ -105,7 +105,7 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 14 | Dashboard (gráficos + indicadores) | ✅ Concluída (17 cenários E2E via HTTP real) |
 | 15 | Financeiro | ✅ Concluída (38 cenários E2E via HTTP real) |
 | 16 | Relatórios (PDF) | ✅ Concluída (13 cenários E2E via HTTP real) |
-| 17 | Frontend React | 🔄 **EM ANDAMENTO** (✅ partes 1–9: setup+auth+layout+dashboard, Clientes, Filamentos, Estoque, Impressoras, Pedidos, Orçamentos, Impressões, Financeiro — todas validadas em browser real; próxima parte: Usuários) |
+| 17 | Frontend React | 🔄 **EM ANDAMENTO** (✅ partes 1–10: setup+auth+layout+dashboard, Clientes, Filamentos, Estoque, Impressoras, Pedidos, Orçamentos, Impressões, Financeiro, Usuários — todas validadas em browser real; restam: gráficos no dashboard, Relatórios, docker-compose) |
 | 18 | Testes (JUnit, Mockito, integração) | ⬜ |
 | 19 | Melhorias finais (rate limit, etc.) | ⬜ |
 
@@ -259,7 +259,9 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 - **Parte 9 — Financeiro** (`pages/financial/`): `api/financial.ts` (tipos + `TRANSICOES_TRANSACAO`), `FinancialPage.tsx` (**cards do resumo do mês corrente** via `/financial/resumo` acima dos filtros; tabela com tipo/vínculo/valor com sinal; **`podeGerenciar` = ADMINISTRADOR/FINANCEIRO**, diferente dos CRUDs), `TransactionFormDialog.tsx` (status inicial PENDENTE|PAGA só no cadastro; **vínculos pedido/cliente são preservados na edição** — o form repassa os ids da transação sem exibi-los), `TransactionStatusDialog.tsx` (baixa/estorno/cancelamento). Editar/excluir só PENDENTE; cancelada bloqueia tudo. Invalidação por prefixo `['financial']` atualiza lista + resumo juntos. Validado (`drive-financeiro.mjs`): resumo reage a lançamento (comparação antes/depois do card — valores acumulam entre execuções, não usar valor exato), despesa paga, receita pendente→baixa→estorno→edição→cancelamento, exclusão, filtros com espera de linha sumir.
 
-**Partes restantes da etapa (ordem combinada com o usuário):** Usuários (só ADMIN), gráficos Recharts no dashboard (séries `/dashboard/*` e `/financial/resumo/mensal` já prontas), tela de Relatórios (download blob dos PDFs), e por fim descomentar o serviço `frontend` no docker-compose e validar o build NGINX.
+- **Parte 10 — Usuários** (`pages/users/`): `api/users.ts` (+`ROTULOS_ROLE`), `UsersPage.tsx` (rota já restrita a ADMINISTRADOR pelo menu/perfis; filtros busca/papel/situação; desativar próprio usuário bloqueado na UI — backend também recusa; desativar revoga sessões, reativar via botão), `UserFormDialog.tsx` (senha só no cadastro). **`components/ChangePasswordDialog.tsx` pendurado no `AppLayout`** (ícone de chave no AppBar, disponível a todos os perfis): confirmação client-side, e após trocar chama `logout()` — o backend revoga todas as sessões, então o fluxo leva ao login. Validado (`drive-usuarios.mjs`): CRUD, 409 de e-mail duplicado, desativar/reativar, filtro por papel, sessão de OPERADOR sem menu Usuários, troca de senha com confirmação errada → certa → relogin (antiga falha, nova entra).
+
+**Partes restantes da etapa (ordem combinada com o usuário):** gráficos Recharts no dashboard (séries `/dashboard/*` e `/financial/resumo/mensal` já prontas), tela de Relatórios (download blob dos PDFs), e por fim descomentar o serviço `frontend` no docker-compose e validar o build NGINX.
 
 ### Frontend React (Etapa 17 — parte 1)
 - Projeto Vite (react-ts) criado em `frontend/` preservando Dockerfile/nginx.conf; estrutura em `src/`: `api/` (Axios + tipos), `auth/` (AuthProvider + RequireAuth + localStorage), `layout/` (AppLayout), `pages/`, `theme.ts` (azul-petróleo #34495e, mesmo dos PDFs; locale ptBR). Detalhes de uso no `frontend/README.md`.
@@ -295,5 +297,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Continuar a **Etapa 17 — Frontend React** na próxima parte: **Usuários** (CRUD só ADMINISTRADOR; endpoints `/users` da Etapa 7, inclui `/users/me` e troca de senha). Fluxo de trabalho estabelecido por tela: conferir DTOs do backend → escrever api/página/dialogs → `npm run build` + lint → validar em browser real (padrão dos scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge; backend via `docker compose up -d` e `npm run dev` em `frontend/`) → commit por parte. Toda a API está no Swagger (`/api/swagger-ui.html`). Upload de STL/3MF continua adiado.
+3. Continuar a **Etapa 17 — Frontend React** nas partes finais: **gráficos Recharts no dashboard** (séries `/dashboard/vendas-mensais|consumo-filamento|taxa-sucesso|top-clientes` e `/financial/resumo/mensal` — já vêm com N meses completos zerados), depois **Relatórios** (download blob dos 3 PDFs) e por fim **descomentar o serviço `frontend` no docker-compose** e validar o build NGINX. Fluxo de trabalho estabelecido por tela: conferir DTOs do backend → escrever api/página/dialogs → `npm run build` + lint → validar em browser real (padrão dos scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge; backend via `docker compose up -d` e `npm run dev` em `frontend/`) → commit por parte. Toda a API está no Swagger (`/api/swagger-ui.html`). Upload de STL/3MF continua adiado.
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.

@@ -8,6 +8,7 @@ import { OrdersPage } from './pages/orders/OrdersPage';
 import { PrintersPage } from './pages/printers/PrintersPage';
 import { PrintsPage } from './pages/prints/PrintsPage';
 import { PublicQuotePage } from './pages/quotes/PublicQuotePage';
+import { UsersPage } from './pages/users/UsersPage';
 import { QuotesPage } from './pages/quotes/QuotesPage';
 import { AppLayout } from './layout/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
@@ -36,7 +37,7 @@ export function App() {
         <Route path="impressoes" element={<PrintsPage />} />
         <Route path="financeiro" element={<FinancialPage />} />
         <Route path="relatorios" element={<PlaceholderPage titulo="Relatórios" />} />
-        <Route path="usuarios" element={<PlaceholderPage titulo="Usuários" />} />
+        <Route path="usuarios" element={<UsersPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
