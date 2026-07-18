@@ -31,6 +31,14 @@ server:
   port: 8080
   servlet:
     context-path: /api
+  # Atrás do NGINX todos os clientes chegariam com o IP do proxy — o
+  # RemoteIpValve troca o remote address pelo X-Forwarded-For quando o
+  # peer direto é um proxy interno (faixas privadas, caso da rede Docker),
+  # mantendo o rate limit e os logs por IP real do cliente.
+  tomcat:
+    remoteip:
+      remote-ip-header: x-forwarded-for
+      protocol-header: x-forwarded-proto
   error:
     include-message: always
     include-stacktrace: never
