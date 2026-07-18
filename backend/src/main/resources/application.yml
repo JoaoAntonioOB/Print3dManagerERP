@@ -59,3 +59,8 @@ application:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
   storage:
     upload-dir: ${UPLOAD_DIR:./uploads}
+  rate-limit:
+    enabled: ${RATE_LIMIT_ENABLED:true}
+    limite-auth: ${RATE_LIMIT_AUTH:10}
+    limite-public: ${RATE_LIMIT_PUBLIC:30}
+    janela-segundos: ${RATE_LIMIT_JANELA_SEGUNDOS:60}

@@ -3,6 +3,11 @@
 application:
   storage:
     upload-dir: target/test-uploads
+  # Limites folgados para a suíte (muitos logins do mesmo IP do MockMvc);
+  # o teste específico de 429 baixa o limite via @TestPropertySource.
+  rate-limit:
+    limite-auth: 1000
+    limite-public: 1000
 
 logging:
   level:

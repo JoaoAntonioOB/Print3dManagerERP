@@ -113,7 +113,7 @@ npm run dev
 16. ✅ Relatórios
 17. ✅ Frontend React
 18. ✅ Testes
-19. ⬜ Melhorias finais
+19. ✅ Melhorias finais (upload STL/3MF, rate limiting, endurecimento)
 
 ## Testes
 

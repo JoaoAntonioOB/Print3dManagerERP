@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-18** (**Etapa 18 CONCLUÍDA** — 78 testes verdes: unitários JUnit+Mockito e integração Testcontainers+MockMvc; próxima: Etapa 19 — Melhorias finais, aguardando confirmação do usuário).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-18** (**Etapa 19 CONCLUÍDA — roadmap de 19 etapas completo**: upload STL/3MF, rate limiting, aviso de senha default e healthcheck do NGINX corrigido; 104 testes verdes; stack Docker validada em http://localhost).
 
 ---
 
@@ -107,7 +107,7 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 16 | Relatórios (PDF) | ✅ Concluída (13 cenários E2E via HTTP real) |
 | 17 | Frontend React | ✅ Concluída (13 partes — todas as telas, gráficos, relatórios e o serviço NGINX no docker-compose, tudo validado em browser real) |
 | 18 | Testes (JUnit, Mockito, integração) | ✅ Concluída (78 testes: 65 unitários + 13 de integração com Testcontainers) |
-| 19 | Melhorias finais (rate limit, etc.) | 🔄 Em andamento (upload STL/3MF ✅ — 93 testes; restam rate limit e revisão de produção) |
+| 19 | Melhorias finais (rate limit, etc.) | ✅ Concluída (upload STL/3MF + rate limiting + aviso de senha default + healthcheck NGINX; 104 testes) |
 
 ---
 
@@ -291,6 +291,12 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 - Perfil `test` grava uploads em `target/test-uploads`. 15 testes novos (10 unitários com `@TempDir` + 4 de integração multipart + 1 no OrderService) — suíte em **93**.
 - **Gotcha Content-Disposition**: `ContentDisposition.attachment().filename(nome, UTF_8)` faz o Spring emitir o nome como encoded-word RFC 2047 (`=?UTF-8?Q?...?=`) e o browser baixa com nome ilegível — como o nome já é ASCII sanitizado, usar `filename(nome)` sem charset. Detectado na validação em browser real (`drive-upload-modelo.mjs`, novo no scratchpad de drives): fluxo completo anexar → baixar → substituir → remover + leitura fora de PENDENTE, tudo verde.
 
+### Rate limiting e endurecimento (Etapa 19 — partes 3/4, decisões)
+- **`security/ratelimit/`**: `RateLimitFilter` (`OncePerRequestFilter` @Component, ordem alta) limita **por IP** somente as rotas abertas ao público — `/auth/**` (força bruta de login/refresh; default 10 req/min) e `/public/**` (link de orçamento; default 30 req/min). Excedeu → **429 JSON** (ApiErrorResponse) com header `Retry-After`; OPTIONS (preflight) não conta; rotas autenticadas não passam pelo filtro. `RateLimitService`: janela fixa em `ConcurrentHashMap` com `Clock` injetável (testes) e limpeza de janelas expiradas acima de 10k entradas — **em memória, adequado à instância única; cluster exigiria Redis**. Config via `RateLimitProperties` (`application.rate-limit.*`, env vars `RATE_LIMIT_*` no `.env.example`); perfil `test` usa limites 1000 (a suíte loga muito do mesmo IP) e o teste específico baixa o limite com `@TestPropertySource` (contexto próprio) e simula IPs com `request.setRemoteAddr`.
+- **`security/DefaultAdminPasswordWarner`** (ApplicationRunner): loga WARN no boot se `admin@print3d.com` está ativo e ainda autentica com `admin123` — só avisa, não bloqueia (ambiente de avaliação do TCC).
+- **Healthcheck do frontend corrigido**: o wget do busybox resolvia `localhost` para `::1` e o NGINX (`listen 80` só IPv4) recusava — container ficava unhealthy com o site no ar. Trocado para `http://127.0.0.1/` no Dockerfile.
+- Suíte final: **104 testes** (11 novos: 4 unit service + 3 warner + 4 integração 429).
+
 ### Configurações-chave já definidas (application.yml)
 - `application.security.jwt.secret|access-token-expiration|refresh-token-expiration` (access 15 min, refresh 7 dias)
 - `application.cors.allowed-origins` (dev: `http://localhost:5173`)
@@ -316,5 +322,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. A próxima etapa é a **19 — Melhorias finais (rate limit etc.)** — **aguardar confirmação do usuário antes de começar**. Candidatas discutidas no prompt original: rate limiting, troca da senha default do admin, upload de STL/3MF (adiado desde a Etapa 12), revisão de segurança para produção. Regressões: `mvnw test` no backend (78 testes) e o fluxo de validação em browser real (scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge) para o frontend. Toda a API está no Swagger (`/api/swagger-ui.html`).
+3. **O roadmap de 19 etapas está completo.** Trabalho futuro é evolução (ex.: fotos de peças, notificações, multi-tenancy) — combinar escopo com o usuário antes. Regressões: `mvnw test` no backend (104 testes; exige Docker) e o fluxo de validação em browser real (scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge) para o frontend. Toda a API está no Swagger (`/api/swagger-ui.html`). Em produção real: trocar a senha do admin (o boot avisa), gerar `JWT_SECRET` novo e revisar o `.env`.
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.
