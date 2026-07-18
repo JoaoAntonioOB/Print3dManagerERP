@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md — Print3D Manager ERP
 
-> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-17** (Etapa 17 — partes 1 a 8 concluídas; próxima parte: Financeiro, ver seção do Frontend).
+> **Propósito deste arquivo:** contexto completo do projeto para retomada do desenvolvimento em novas sessões. Leia-o integralmente antes de escrever qualquer código. Última atualização: **2026-07-17** (Etapa 17 — partes 1 a 9 concluídas; próxima parte: Usuários, ver seção do Frontend).
 
 ---
 
@@ -105,7 +105,7 @@ Cada módulo contém internamente: `controller/`, `service/`, `repository/`, `mo
 | 14 | Dashboard (gráficos + indicadores) | ✅ Concluída (17 cenários E2E via HTTP real) |
 | 15 | Financeiro | ✅ Concluída (38 cenários E2E via HTTP real) |
 | 16 | Relatórios (PDF) | ✅ Concluída (13 cenários E2E via HTTP real) |
-| 17 | Frontend React | 🔄 **EM ANDAMENTO** (✅ partes 1–8: setup+auth+layout+dashboard, Clientes, Filamentos, Estoque, Impressoras, Pedidos, Orçamentos, Impressões — todas validadas em browser real; próxima parte: Financeiro) |
+| 17 | Frontend React | 🔄 **EM ANDAMENTO** (✅ partes 1–9: setup+auth+layout+dashboard, Clientes, Filamentos, Estoque, Impressoras, Pedidos, Orçamentos, Impressões, Financeiro — todas validadas em browser real; próxima parte: Usuários) |
 | 18 | Testes (JUnit, Mockito, integração) | ⬜ |
 | 19 | Melhorias finais (rate limit, etc.) | ⬜ |
 
@@ -257,7 +257,9 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 - **Parte 8 — Impressões** (`pages/prints/`): `api/prints.ts`, `PrintsPage.tsx` (filtros impressora+status; ações só em EM_ANDAMENTO: concluir/falhar/cancelar), `PrintStartDialog.tsx` (impressora só DISPONIVEL+ativa; pedido EM_PRODUCAO opcional → select dependente de item via `GET /orders/{id}`; filamento opcional), `PrintFinishDialog.tsx` (modo concluir|falhar — falha exige motivo; peso abate estoque do filamento nos dois casos), cancelar via ConfirmDialog (PATCH sem corpo). Invalida queries de `prints`+`printers` (+`filaments` na finalização) para refletir status da máquina e estoque. **Gotcha de teste**: checagem de filtro em lista com `placeholderData` deve esperar as linhas filtradas SUMIREM (state detached) — esperar a linha presente passa com dados stale. Validado (`drive-impressoes.mjs`): job vinculado a item de pedido, impressora ocupada some do select de novo job, concluir com peso/energia (custo real calculado), falhar com motivo, cancelar liberando a máquina, filtros.
 
-**Partes restantes da etapa (ordem combinada com o usuário):** Financeiro (transações + resumo), Usuários (só ADMIN), gráficos Recharts no dashboard (séries `/dashboard/*` e `/financial/resumo/mensal` já prontas), tela de Relatórios (download blob dos PDFs), e por fim descomentar o serviço `frontend` no docker-compose e validar o build NGINX.
+- **Parte 9 — Financeiro** (`pages/financial/`): `api/financial.ts` (tipos + `TRANSICOES_TRANSACAO`), `FinancialPage.tsx` (**cards do resumo do mês corrente** via `/financial/resumo` acima dos filtros; tabela com tipo/vínculo/valor com sinal; **`podeGerenciar` = ADMINISTRADOR/FINANCEIRO**, diferente dos CRUDs), `TransactionFormDialog.tsx` (status inicial PENDENTE|PAGA só no cadastro; **vínculos pedido/cliente são preservados na edição** — o form repassa os ids da transação sem exibi-los), `TransactionStatusDialog.tsx` (baixa/estorno/cancelamento). Editar/excluir só PENDENTE; cancelada bloqueia tudo. Invalidação por prefixo `['financial']` atualiza lista + resumo juntos. Validado (`drive-financeiro.mjs`): resumo reage a lançamento (comparação antes/depois do card — valores acumulam entre execuções, não usar valor exato), despesa paga, receita pendente→baixa→estorno→edição→cancelamento, exclusão, filtros com espera de linha sumir.
+
+**Partes restantes da etapa (ordem combinada com o usuário):** Usuários (só ADMIN), gráficos Recharts no dashboard (séries `/dashboard/*` e `/financial/resumo/mensal` já prontas), tela de Relatórios (download blob dos PDFs), e por fim descomentar o serviço `frontend` no docker-compose e validar o build NGINX.
 
 ### Frontend React (Etapa 17 — parte 1)
 - Projeto Vite (react-ts) criado em `frontend/` preservando Dockerfile/nginx.conf; estrutura em `src/`: `api/` (Axios + tipos), `auth/` (AuthProvider + RequireAuth + localStorage), `layout/` (AppLayout), `pages/`, `theme.ts` (azul-petróleo #34495e, mesmo dos PDFs; locale ptBR). Detalhes de uso no `frontend/README.md`.
@@ -293,5 +295,5 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 
 1. Ler este arquivo e o `README.md`.
 2. Confirmar o status da tabela da seção 5 com o usuário.
-3. Continuar a **Etapa 17 — Frontend React** na próxima parte: **Financeiro** (transações + resumo; endpoints `/financial/*` da Etapa 15 — atenção: quem gerencia é ADMINISTRADOR/FINANCEIRO, diferente dos CRUDs). Fluxo de trabalho estabelecido por tela: conferir DTOs do backend → escrever api/página/dialogs → `npm run build` + lint → validar em browser real (padrão dos scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge; backend via `docker compose up -d` e `npm run dev` em `frontend/`) → commit por parte. Toda a API está no Swagger (`/api/swagger-ui.html`). Upload de STL/3MF continua adiado.
+3. Continuar a **Etapa 17 — Frontend React** na próxima parte: **Usuários** (CRUD só ADMINISTRADOR; endpoints `/users` da Etapa 7, inclui `/users/me` e troca de senha). Fluxo de trabalho estabelecido por tela: conferir DTOs do backend → escrever api/página/dialogs → `npm run build` + lint → validar em browser real (padrão dos scripts em `scratchpad/browser-drive/`, playwright-core + canal msedge; backend via `docker compose up -d` e `npm run dev` em `frontend/`) → commit por parte. Toda a API está no Swagger (`/api/swagger-ui.html`). Upload de STL/3MF continua adiado.
 4. Ao final de cada etapa: explicar decisões, validar build (`.\mvnw.cmd -B compile`) e **aguardar confirmação do usuário** antes da próxima etapa.

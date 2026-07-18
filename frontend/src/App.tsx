@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth } from './auth/RequireAuth';
 import { ClientsPage } from './pages/clients/ClientsPage';
 import { FilamentsPage } from './pages/filaments/FilamentsPage';
+import { FinancialPage } from './pages/financial/FinancialPage';
 import { InventoryPage } from './pages/inventory/InventoryPage';
 import { OrdersPage } from './pages/orders/OrdersPage';
 import { PrintersPage } from './pages/printers/PrintersPage';
@@ -33,7 +34,7 @@ export function App() {
         <Route path="estoque" element={<InventoryPage />} />
         <Route path="impressoras" element={<PrintersPage />} />
         <Route path="impressoes" element={<PrintsPage />} />
-        <Route path="financeiro" element={<PlaceholderPage titulo="Financeiro" />} />
+        <Route path="financeiro" element={<FinancialPage />} />
         <Route path="relatorios" element={<PlaceholderPage titulo="Relatórios" />} />
         <Route path="usuarios" element={<PlaceholderPage titulo="Usuários" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
