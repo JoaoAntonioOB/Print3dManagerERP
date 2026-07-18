@@ -5,6 +5,7 @@ import { FilamentsPage } from './pages/filaments/FilamentsPage';
 import { InventoryPage } from './pages/inventory/InventoryPage';
 import { OrdersPage } from './pages/orders/OrdersPage';
 import { PrintersPage } from './pages/printers/PrintersPage';
+import { PrintsPage } from './pages/prints/PrintsPage';
 import { PublicQuotePage } from './pages/quotes/PublicQuotePage';
 import { QuotesPage } from './pages/quotes/QuotesPage';
 import { AppLayout } from './layout/AppLayout';
@@ -31,7 +32,7 @@ export function App() {
         <Route path="filamentos" element={<FilamentsPage />} />
         <Route path="estoque" element={<InventoryPage />} />
         <Route path="impressoras" element={<PrintersPage />} />
-        <Route path="impressoes" element={<PlaceholderPage titulo="Impressões" />} />
+        <Route path="impressoes" element={<PrintsPage />} />
         <Route path="financeiro" element={<PlaceholderPage titulo="Financeiro" />} />
         <Route path="relatorios" element={<PlaceholderPage titulo="Relatórios" />} />
         <Route path="usuarios" element={<PlaceholderPage titulo="Usuários" />} />
