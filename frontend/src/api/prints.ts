@@ -60,6 +60,7 @@ export interface ImpressaoFinishInput {
 
 export interface FiltrosImpressoes {
   impressoraId?: number | '';
+  itemPedidoId?: number | '';
   status?: PrintStatus | '';
   page: number;
   size: number;
@@ -70,6 +71,7 @@ export const printsApi = {
     const { data } = await api.get<PageResponse<Impressao>>('/prints', {
       params: {
         impressoraId: filtros.impressoraId === '' ? undefined : filtros.impressoraId,
+        itemPedidoId: filtros.itemPedidoId === '' ? undefined : filtros.itemPedidoId,
         status: filtros.status || undefined,
         page: filtros.page,
         size: filtros.size,

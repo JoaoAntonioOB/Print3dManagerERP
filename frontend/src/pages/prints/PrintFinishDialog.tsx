@@ -16,7 +16,7 @@ import toast from 'react-hot-toast';
 import { z } from 'zod';
 import { mensagemDeErro } from '../../api/client';
 import { printsApi, type Impressao } from '../../api/prints';
-import { decimalOpcional, paraNumero, paraTexto } from '../../lib/form';
+import { decimalOpcional, paraCampo, paraNumero, paraTexto } from '../../lib/form';
 
 const esquemaFim = z.object({
   motivoFalha: z.string(),
@@ -36,9 +36,18 @@ const FORMULARIO_VAZIO: DadosFormulario = {
 
 export type ModoFinalizacao = 'concluir' | 'falhar';
 
+function paraValoresIniciais(concluindo: boolean, pesoSugeridoG?: number | null): DadosFormulario {
+  return {
+    ...FORMULARIO_VAZIO,
+    pesoUtilizadoG: concluindo ? paraCampo(pesoSugeridoG ?? null) : '',
+  };
+}
+
 interface PrintFinishDialogProps {
   impressao: Impressao | null;
   modo: ModoFinalizacao;
+  /** Só usado quando modo === 'concluir'; ex.: pesoEstimadoG do item do pedido. */
+  pesoSugeridoG?: number | null;
   onFechar: () => void;
 }
 
@@ -46,7 +55,12 @@ interface PrintFinishDialogProps {
  * Conclui ou registra falha de um job EM_ANDAMENTO. Nos dois casos o peso
  * informado é abatido do estoque do filamento (na falha, material perdido).
  */
-export function PrintFinishDialog({ impressao, modo, onFechar }: PrintFinishDialogProps) {
+export function PrintFinishDialog({
+  impressao,
+  modo,
+  pesoSugeridoG,
+  onFechar,
+}: PrintFinishDialogProps) {
   const queryClient = useQueryClient();
   const concluindo = modo === 'concluir';
 
@@ -62,9 +76,9 @@ export function PrintFinishDialog({ impressao, modo, onFechar }: PrintFinishDial
 
   useEffect(() => {
     if (impressao) {
-      reset(FORMULARIO_VAZIO);
+      reset(paraValoresIniciais(concluindo, pesoSugeridoG));
     }
-  }, [impressao, reset]);
+  }, [impressao, concluindo, pesoSugeridoG, reset]);
 
   const finalizar = useMutation({
     mutationFn: (dados: DadosFormulario) => {

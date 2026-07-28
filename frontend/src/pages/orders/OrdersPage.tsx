@@ -23,8 +23,9 @@ import {
   Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+import { useSearchParams } from 'react-router-dom';
 import { mensagemDeErro } from '../../api/client';
 import {
   CORES_STATUS_PEDIDO,
@@ -63,6 +64,17 @@ export function OrdersPage() {
   const [pedidoStatus, setPedidoStatus] = useState<PedidoResumo | null>(null);
   const [pedidoParaExcluir, setPedidoParaExcluir] = useState<PedidoResumo | null>(null);
   const [pedidoParaFaturar, setPedidoParaFaturar] = useState<PedidoResumo | null>(null);
+
+  // Atalho do botão "Novo pedido" no cabeçalho (/pedidos?novo=1) — abre o
+  // diálogo já aqui e limpa o parâmetro pra não reabrir num F5.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('novo') === '1') {
+      setPedidoIdAberto(null);
+      setFormAberto(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const filtros = { busca: buscaEstavel, status, page, size };
 

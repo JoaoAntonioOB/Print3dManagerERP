@@ -7,6 +7,7 @@ import {
   DialogTitle,
   Stack,
   TextField,
+  Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
@@ -38,6 +39,27 @@ const FORMULARIO_VAZIO: DadosFormulario = {
   observacoes: '',
 };
 
+/** Vem do Pedido: item/filamento já são conhecidos, só falta escolher a impressora. */
+export interface ImpressaoPreDefinida {
+  pedidoId: number;
+  itemPedidoId: number;
+  filamentoId: number | null;
+  /** Texto exibido no lugar dos selects de pedido/item/filamento. */
+  resumo: string;
+}
+
+function paraValoresIniciais(predefinido?: ImpressaoPreDefinida): DadosFormulario {
+  if (!predefinido) {
+    return FORMULARIO_VAZIO;
+  }
+  return {
+    ...FORMULARIO_VAZIO,
+    pedidoId: String(predefinido.pedidoId),
+    itemPedidoId: String(predefinido.itemPedidoId),
+    filamentoId: predefinido.filamentoId !== null ? String(predefinido.filamentoId) : '',
+  };
+}
+
 function paraPayload(dados: DadosFormulario): ImpressaoStartInput {
   return {
     impressoraId: Number(dados.impressoraId),
@@ -50,10 +72,12 @@ function paraPayload(dados: DadosFormulario): ImpressaoStartInput {
 interface PrintStartDialogProps {
   aberto: boolean;
   onFechar: () => void;
+  /** Presente = fluxo a partir de um pedido: trava pedido/item/filamento e mostra resumo. */
+  predefinido?: ImpressaoPreDefinida;
 }
 
 /** Inicia um job: impressora DISPONIVEL, filamento opcional e item de pedido opcional. */
-export function PrintStartDialog({ aberto, onFechar }: PrintStartDialogProps) {
+export function PrintStartDialog({ aberto, onFechar, predefinido }: PrintStartDialogProps) {
   const queryClient = useQueryClient();
 
   const {
@@ -70,9 +94,9 @@ export function PrintStartDialog({ aberto, onFechar }: PrintStartDialogProps) {
 
   useEffect(() => {
     if (aberto) {
-      reset(FORMULARIO_VAZIO);
+      reset(paraValoresIniciais(predefinido));
     }
-  }, [aberto, reset]);
+  }, [aberto, predefinido, reset]);
 
   const { data: impressoras } = useQuery({
     queryKey: ['printers', 'select', 'disponiveis'],
@@ -84,21 +108,21 @@ export function PrintStartDialog({ aberto, onFechar }: PrintStartDialogProps) {
   const { data: filamentos } = useQuery({
     queryKey: ['filaments', 'select'],
     queryFn: () => filamentsApi.listar({ ativo: true, page: 0, size: 100 }),
-    enabled: aberto,
+    enabled: aberto && !predefinido,
   });
 
   // Só pedidos EM_PRODUCAO podem ter itens impressos.
   const { data: pedidos } = useQuery({
     queryKey: ['orders', 'select', 'em-producao'],
     queryFn: () => ordersApi.listar({ status: 'EM_PRODUCAO', page: 0, size: 100 }),
-    enabled: aberto,
+    enabled: aberto && !predefinido,
   });
 
   const pedidoId = watch('pedidoId');
   const { data: pedidoDetalhe } = useQuery({
     queryKey: ['orders', 'detalhe', Number(pedidoId)],
     queryFn: () => ordersApi.buscarPorId(Number(pedidoId)),
-    enabled: aberto && pedidoId !== '',
+    enabled: aberto && !predefinido && pedidoId !== '',
   });
 
   const iniciar = useMutation({
@@ -114,7 +138,7 @@ export function PrintStartDialog({ aberto, onFechar }: PrintStartDialogProps) {
 
   return (
     <Dialog open={aberto} onClose={onFechar} maxWidth="sm" fullWidth>
-      <DialogTitle>Nova impressão</DialogTitle>
+      <DialogTitle>{predefinido ? 'Iniciar impressão' : 'Nova impressão'}</DialogTitle>
       <form onSubmit={handleSubmit((dados) => iniciar.mutate(dados))} noValidate>
         <DialogContent sx={{ pt: 1 }}>
           <Stack spacing={2}>
@@ -133,50 +157,58 @@ export function PrintStartDialog({ aberto, onFechar }: PrintStartDialogProps) {
                 </option>
               ))}
             </TextField>
-            <TextField
-              label="Filamento"
-              select
-              helperText="Necessário para abater o estoque ao finalizar"
-              slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
-              {...register('filamentoId')}
-            >
-              <option value="">—</option>
-              {filamentos?.content.map((filamento) => (
-                <option key={filamento.id} value={String(filamento.id)}>
-                  {filamento.nome}
-                </option>
-              ))}
-            </TextField>
-            <TextField
-              label="Pedido (em produção)"
-              select
-              helperText="Vazio = impressão avulsa"
-              slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
-              {...register('pedidoId', {
-                onChange: () => setValue('itemPedidoId', ''),
-              })}
-            >
-              <option value="">—</option>
-              {pedidos?.content.map((pedido) => (
-                <option key={pedido.id} value={String(pedido.id)}>
-                  {pedido.numero} — {pedido.clienteNome}
-                </option>
-              ))}
-            </TextField>
-            {pedidoId !== '' && (
-              <TextField
-                label="Item do pedido"
-                select
-                slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
-                {...register('itemPedidoId')}
-              >
-                <option value="">—</option>
-                {pedidoDetalhe?.itens.map((item) => (
-                  <option key={item.id} value={String(item.id)}>
-                    {item.nomePeca} (x{item.quantidade})
-                  </option>
-                ))}
-              </TextField>
+            {predefinido ? (
+              <Typography variant="body2" color="text.secondary">
+                {predefinido.resumo}
+              </Typography>
+            ) : (
+              <>
+                <TextField
+                  label="Filamento"
+                  select
+                  helperText="Necessário para abater o estoque ao finalizar"
+                  slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+                  {...register('filamentoId')}
+                >
+                  <option value="">—</option>
+                  {filamentos?.content.map((filamento) => (
+                    <option key={filamento.id} value={String(filamento.id)}>
+                      {filamento.nome}
+                    </option>
+                  ))}
+                </TextField>
+                <TextField
+                  label="Pedido (em produção)"
+                  select
+                  helperText="Vazio = impressão avulsa"
+                  slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+                  {...register('pedidoId', {
+                    onChange: () => setValue('itemPedidoId', ''),
+                  })}
+                >
+                  <option value="">—</option>
+                  {pedidos?.content.map((pedido) => (
+                    <option key={pedido.id} value={String(pedido.id)}>
+                      {pedido.numero} — {pedido.clienteNome}
+                    </option>
+                  ))}
+                </TextField>
+                {pedidoId !== '' && (
+                  <TextField
+                    label="Item do pedido"
+                    select
+                    slotProps={{ select: { native: true }, inputLabel: { shrink: true } }}
+                    {...register('itemPedidoId')}
+                  >
+                    <option value="">—</option>
+                    {pedidoDetalhe?.itens.map((item) => (
+                      <option key={item.id} value={String(item.id)}>
+                        {item.nomePeca} (x{item.quantidade})
+                      </option>
+                    ))}
+                  </TextField>
+                )}
+              </>
             )}
             <TextField label="Observações" multiline minRows={2} {...register('observacoes')} />
           </Stack>

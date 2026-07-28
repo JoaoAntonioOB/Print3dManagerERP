@@ -1,3 +1,5 @@
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import GroupIcon from '@mui/icons-material/Group';
 import PaidIcon from '@mui/icons-material/Paid';
 import PrintIcon from '@mui/icons-material/Print';
@@ -22,6 +24,9 @@ import {
   Legend,
   Line,
   LineChart,
+  PolarAngleAxis,
+  RadialBar,
+  RadialBarChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -29,14 +34,56 @@ import {
 } from 'recharts';
 import { mensagemDeErro } from '../api/client';
 import { dashboardApi } from '../api/dashboard';
+import { AcoesHoje } from './dashboard/AcoesHoje';
+import { AtividadeRecente } from './dashboard/AtividadeRecente';
+import { EstoqueCritico } from './dashboard/EstoqueCritico';
+import { ProducaoAndamento } from './dashboard/ProducaoAndamento';
+import { ResumoFinanceiroDonut } from './dashboard/ResumoFinanceiroDonut';
+import { Sparkline } from './dashboard/Sparkline';
+
+/** % de variação entre os dois últimos pontos de uma série mensal (null sem base suficiente). */
+function variacaoPercentual(serie: number[]): number | null {
+  if (serie.length < 2) return null;
+  const atual = serie[serie.length - 1];
+  const anterior = serie[serie.length - 2];
+  if (anterior === 0) return atual > 0 ? 100 : null;
+  return ((atual - anterior) / anterior) * 100;
+}
+
+function ChipVariacao({ variacao }: { variacao: number }) {
+  const positiva = variacao >= 0;
+  return (
+    <Chip
+      size="small"
+      color={positiva ? 'success' : 'error'}
+      icon={positiva ? <ArrowUpwardIcon /> : <ArrowDownwardIcon />}
+      label={`${positiva ? '+' : ''}${variacao.toFixed(0)}% vs mês anterior`}
+    />
+  );
+}
 
 const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const compacto = new Intl.NumberFormat('pt-BR', { notation: 'compact' });
 
-// Paleta validada (dataviz): azul para séries únicas/receitas, laranja para despesas.
-const AZUL = '#3572b0';
-const LARANJA = '#c8611a';
-const GRADE = '#e6e6e3';
+// Paleta validada (dataviz, contra o fundo escuro do app): azul para séries
+// únicas/receitas, laranja para despesas — mesmo par usado antes, hex
+// atualizado para os steps validados em modo escuro (CVD + contraste).
+const AZUL = '#3987e5';
+const LARANJA = '#d95926';
+const GRADE = 'rgba(231, 237, 243, 0.16)';
+
+// Chrome do tooltip (fundo/borda/texto) casado com o tema escuro — não mexe na
+// paleta de série (AZUL/LARANJA), que fica para revisão futura com a skill dataviz.
+const TOOLTIP_ESTILO = {
+  contentStyle: {
+    background: '#1a222c',
+    border: '1px solid rgba(231, 237, 243, 0.12)',
+    borderRadius: 8,
+    color: '#e7edf3',
+  },
+  labelStyle: { color: '#9fb0c0' },
+  itemStyle: { color: '#e7edf3' },
+};
 
 /** 'YYYY-MM' → 'MM/AA' para o eixo. */
 const rotuloMes = (mes: string) => `${mes.slice(5, 7)}/${mes.slice(2, 4)}`;
@@ -45,26 +92,49 @@ function CartaoIndicador({
   titulo,
   valor,
   icone,
+  cor = '#3987e5',
+  variacao,
+  sparklineDados,
   rodape,
 }: {
   titulo: string;
   valor: ReactNode;
   icone: ReactElement;
+  cor?: string;
+  variacao?: number | null;
+  sparklineDados?: number[];
   rodape?: ReactNode;
 }) {
   return (
     <Card sx={{ height: '100%' }}>
       <CardContent>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
-          <Box sx={{ color: 'primary.main', display: 'flex' }}>{icone}</Box>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: (t) => `color-mix(in srgb, ${cor} 20%, ${t.palette.background.paper})`,
+              color: cor,
+            }}
+          >
+            {icone}
+          </Box>
           <Typography variant="body2" color="text.secondary">
             {titulo}
           </Typography>
         </Stack>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          {valor}
-        </Typography>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            {valor}
+          </Typography>
+          {variacao != null && <ChipVariacao variacao={variacao} />}
+        </Stack>
         {rodape && <Box sx={{ mt: 1 }}>{rodape}</Box>}
+        {sparklineDados && <Sparkline dados={sparklineDados} cor={cor} />}
       </CardContent>
     </Card>
   );
@@ -137,11 +207,18 @@ export function DashboardPage() {
     return <Alert severity="error">{mensagemDeErro(error)}</Alert>;
   }
 
+  const seriePedidos = vendas?.map((p) => p.pedidos) ?? [];
+  const serieFaturamento = vendas?.map((p) => p.faturamento) ?? [];
+  const variacaoPedidos = variacaoPercentual(seriePedidos);
+  const variacaoFaturamento = variacaoPercentual(serieFaturamento);
+
   return (
     <Box>
       <Typography variant="h5" sx={{ fontWeight: 700, mb: 3 }}>
         Dashboard
       </Typography>
+
+      {data && <AcoesHoje resumo={data} />}
 
       <Box
         sx={{
@@ -160,6 +237,9 @@ export function DashboardPage() {
               titulo="Pedidos no mês"
               valor={data.pedidosMesAtual}
               icone={<ReceiptLongIcon />}
+              cor="#3987e5"
+              variacao={variacaoPedidos}
+              sparklineDados={seriePedidos.slice(-8)}
               rodape={
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                   {Object.entries(data.pedidosPorStatus)
@@ -178,16 +258,21 @@ export function DashboardPage() {
               titulo="Faturamento no mês (entregues)"
               valor={moeda.format(data.faturamentoMesAtual)}
               icone={<PaidIcon />}
+              cor="#0ca30c"
+              variacao={variacaoFaturamento}
+              sparklineDados={serieFaturamento.slice(-8)}
             />
             <CartaoIndicador
               titulo="Impressões em andamento"
               valor={data.impressoesEmAndamento}
               icone={<PrintIcon />}
+              cor="#199e70"
             />
             <CartaoIndicador
               titulo="Clientes ativos"
               valor={data.clientesAtivos}
               icone={<GroupIcon />}
+              cor="#9085e9"
               rodape={
                 data.filamentosEstoqueBaixo + data.itensEstoqueBaixo > 0 ? (
                   <Chip
@@ -221,6 +306,7 @@ export function DashboardPage() {
               <XAxis dataKey="mes" tickFormatter={rotuloMes} tickLine={false} fontSize={12} />
               <YAxis tickFormatter={(v: number) => compacto.format(v)} tickLine={false} fontSize={12} width={48} />
               <Tooltip
+                {...TOOLTIP_ESTILO}
                 labelFormatter={(mes) => rotuloMes(String(mes))}
                 formatter={(valor) => [moeda.format(Number(valor)), 'Faturamento']}
               />
@@ -239,6 +325,7 @@ export function DashboardPage() {
               <XAxis dataKey="mes" tickFormatter={rotuloMes} tickLine={false} fontSize={12} />
               <YAxis allowDecimals={false} tickLine={false} fontSize={12} width={32} />
               <Tooltip
+                {...TOOLTIP_ESTILO}
                 labelFormatter={(mes) => rotuloMes(String(mes))}
                 formatter={(valor) => [String(valor), 'Pedidos']}
               />
@@ -263,6 +350,7 @@ export function DashboardPage() {
               <XAxis dataKey="mes" tickFormatter={rotuloMes} tickLine={false} fontSize={12} />
               <YAxis tickFormatter={(v: number) => compacto.format(v)} tickLine={false} fontSize={12} width={48} />
               <Tooltip
+                {...TOOLTIP_ESTILO}
                 labelFormatter={(mes) => rotuloMes(String(mes))}
                 formatter={(valor, nome) => [
                   moeda.format(Number(valor)),
@@ -276,6 +364,8 @@ export function DashboardPage() {
           </ResponsiveContainer>
         </CartaoGrafico>
 
+        <ResumoFinanceiroDonut />
+
         <CartaoGrafico
           titulo={`Consumo de filamento em gramas (últimos ${MESES_SERIES} meses)`}
           carregando={carregandoConsumo}
@@ -286,6 +376,7 @@ export function DashboardPage() {
               <XAxis dataKey="mes" tickFormatter={rotuloMes} tickLine={false} fontSize={12} />
               <YAxis tickFormatter={(v: number) => compacto.format(v)} tickLine={false} fontSize={12} width={48} />
               <Tooltip
+                {...TOOLTIP_ESTILO}
                 labelFormatter={(mes) => rotuloMes(String(mes))}
                 formatter={(valor) => [`${compacto.format(Number(valor))} g`, 'Consumo']}
               />
@@ -321,6 +412,7 @@ export function DashboardPage() {
                   fontSize={12}
                 />
                 <Tooltip
+                  {...TOOLTIP_ESTILO}
                   formatter={(valor) => [moeda.format(Number(valor)), 'Valor total']}
                 />
                 <Bar dataKey="valorTotal" fill={AZUL} radius={[0, 4, 4, 0]} maxBarSize={22} />
@@ -329,7 +421,7 @@ export function DashboardPage() {
           )}
         </CartaoGrafico>
 
-        {/* Taxa de sucesso: número-manchete, não gráfico (um único valor). */}
+        {/* Taxa de sucesso reaproveitada como gauge — mesmo dado, forma radial. */}
         <Card>
           <CardContent>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -345,13 +437,45 @@ export function DashboardPage() {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 2,
+                  gap: 1,
                 }}
               >
-                <Typography variant="h2" color="primary" sx={{ fontWeight: 700 }}>
-                  {taxa.taxaSucesso != null ? `${String(taxa.taxaSucesso).replace('.', ',')}%` : '—'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Box sx={{ width: '100%', maxWidth: 220, height: 130, position: 'relative' }}>
+                  <ResponsiveContainer>
+                    <RadialBarChart
+                      innerRadius="70%"
+                      outerRadius="100%"
+                      startAngle={180}
+                      endAngle={0}
+                      data={[{ nome: 'taxa', valor: taxa.taxaSucesso ?? 0 }]}
+                    >
+                      <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                      <RadialBar
+                        dataKey="valor"
+                        cornerRadius={8}
+                        fill="#0ca30c"
+                        background={{ fill: 'rgba(231, 237, 243, 0.12)' }}
+                        isAnimationActive={false}
+                      />
+                    </RadialBarChart>
+                  </ResponsiveContainer>
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      alignItems: 'flex-end',
+                      justifyContent: 'center',
+                      pb: 1,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {taxa.taxaSucesso != null ? `${String(taxa.taxaSucesso).replace('.', ',')}%` : '—'}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
                   {taxa.taxaSucesso != null
                     ? 'das impressões finalizadas foram concluídas com sucesso'
                     : 'Nenhuma impressão finalizada ainda'}
@@ -366,6 +490,19 @@ export function DashboardPage() {
             )}
           </CardContent>
         </Card>
+      </Box>
+
+      <Box
+        sx={{
+          display: 'grid',
+          gap: 2,
+          mt: 2,
+          gridTemplateColumns: { xs: '1fr', lg: 'repeat(3, 1fr)' },
+        }}
+      >
+        <ProducaoAndamento />
+        <EstoqueCritico />
+        <AtividadeRecente />
       </Box>
     </Box>
   );

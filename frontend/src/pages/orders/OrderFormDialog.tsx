@@ -1,13 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import AddIcon from '@mui/icons-material/Add';
+import CancelIcon from '@mui/icons-material/Cancel';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlined';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import PrintIcon from '@mui/icons-material/Print';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import {
   Autocomplete,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -30,9 +35,17 @@ import { filamentsApi } from '../../api/filaments';
 import {
   nomeDoArquivoModelo,
   ordersApi,
+  type ItemPedido,
   type Pedido,
   type PedidoInput,
 } from '../../api/orders';
+import {
+  CORES_STATUS_IMPRESSAO,
+  printsApi,
+  ROTULOS_STATUS_IMPRESSAO,
+  type Impressao,
+} from '../../api/prints';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import {
   decimalObrigatorio,
   decimalOpcional,
@@ -41,6 +54,8 @@ import {
   paraNumero,
   paraTexto,
 } from '../../lib/form';
+import { PrintFinishDialog, type ModoFinalizacao } from '../prints/PrintFinishDialog';
+import { PrintStartDialog } from '../prints/PrintStartDialog';
 
 const esquemaItem = z.object({
   id: z.number().nullable(),
@@ -147,6 +162,14 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
   // edições não salvas dos demais campos.
   const [arquivos, setArquivos] = useState<Record<number, string | undefined>>({});
 
+  // Fluxo Pedido → Impressão (só quando pedido.status === 'EM_PRODUCAO').
+  const [itemParaIniciar, setItemParaIniciar] = useState<ItemPedido | null>(null);
+  const [finalizacao, setFinalizacao] = useState<{
+    impressao: Impressao;
+    modo: ModoFinalizacao;
+  } | null>(null);
+  const [impressaoParaCancelar, setImpressaoParaCancelar] = useState<Impressao | null>(null);
+
   const { data: pedido, isPending: carregandoPedido } = useQuery({
     queryKey: ['orders', 'detalhe', pedidoId],
     queryFn: () => ordersApi.buscarPorId(pedidoId!),
@@ -170,6 +193,22 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
     queryFn: () => filamentsApi.listar({ ativo: true, page: 0, size: 100 }),
     enabled: aberto,
   });
+
+  const { data: impressoesAtivas } = useQuery({
+    queryKey: ['prints', 'ativas-pedido', pedidoId],
+    queryFn: () => printsApi.listar({ status: 'EM_ANDAMENTO', page: 0, size: 100 }),
+    enabled: aberto && pedido?.status === 'EM_PRODUCAO',
+  });
+
+  const idsItensPedido = pedido?.itens.map((item) => item.id) ?? [];
+  const impressaoPorItem = new Map<number, Impressao>(
+    (impressoesAtivas?.content ?? [])
+      .filter(
+        (impressao): impressao is Impressao & { itemPedidoId: number } =>
+          impressao.itemPedidoId !== null && idsItensPedido.includes(impressao.itemPedidoId),
+      )
+      .map((impressao) => [impressao.itemPedidoId, impressao]),
+  );
 
   const {
     register,
@@ -235,6 +274,20 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
     onError: (erro) => toast.error(mensagemDeErro(erro)),
   });
 
+  const cancelarImpressao = useMutation({
+    mutationFn: (id: number) => printsApi.cancelar(id),
+    onSuccess: () => {
+      toast.success('Impressão cancelada. A impressora foi liberada.');
+      queryClient.invalidateQueries({ queryKey: ['prints'] });
+      queryClient.invalidateQueries({ queryKey: ['printers'] });
+      setImpressaoParaCancelar(null);
+    },
+    onError: (erro) => {
+      toast.error(mensagemDeErro(erro));
+      setImpressaoParaCancelar(null);
+    },
+  });
+
   function aoEscolherArquivo(itemId: number, evento: ChangeEvent<HTMLInputElement>) {
     const arquivo = evento.target.files?.[0];
     evento.target.value = '';
@@ -272,6 +325,7 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
         : `Editar pedido ${pedido?.numero ?? ''}`;
 
   return (
+    <>
     <Dialog open={aberto} onClose={onFechar} maxWidth="lg" fullWidth>
       <DialogTitle>{titulo}</DialogTitle>
       <form onSubmit={handleSubmit((dados) => salvar.mutate(dados))} noValidate>
@@ -352,7 +406,16 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
                 </Typography>
               )}
 
-              {fields.map((campo, indice) => (
+              {fields.map((campo, indice) => {
+                // Id real do item (o `campo.id` do useFieldArray é a key
+                // interna do RHF, não o id do backend). Sem id (pedido ou
+                // item ainda não salvos), os blocos de arquivo/impressão somem.
+                const itemId = itens[indice]?.id ?? null;
+                const itemPedido =
+                  itemId !== null ? pedido?.itens.find((i) => i.id === itemId) : undefined;
+                const impressaoAtiva = itemId !== null ? impressaoPorItem.get(itemId) : undefined;
+
+                return (
                 <Box
                   key={campo.id}
                   sx={{
@@ -436,10 +499,6 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
                     </Tooltip>
                   )}
                   {(() => {
-                      // Id real do item (o `campo.id` do useFieldArray é a key
-                      // interna do RHF, não o id do backend). Sem id (pedido ou
-                      // item ainda não salvos), só o hint de salvar antes.
-                      const itemId = itens[indice]?.id ?? null;
                       if (itemId === null) {
                         return somenteLeitura ? null : (
                           <Typography
@@ -511,8 +570,75 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
                         </Box>
                       );
                     })()}
+                  {pedido?.status === 'EM_PRODUCAO' && itemId !== null && itemPedido && (
+                    <Box
+                      sx={{
+                        gridColumn: '1 / -1',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.5,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <Typography variant="caption" color="text.secondary">
+                        Impressão:
+                      </Typography>
+                      {impressaoAtiva ? (
+                        <>
+                          <Chip
+                            size="small"
+                            color={CORES_STATUS_IMPRESSAO[impressaoAtiva.status]}
+                            label={`${ROTULOS_STATUS_IMPRESSAO[impressaoAtiva.status]} — ${impressaoAtiva.impressoraNome}`}
+                          />
+                          <Tooltip title="Concluir">
+                            <IconButton
+                              size="small"
+                              color="success"
+                              aria-label="Concluir impressão"
+                              onClick={() =>
+                                setFinalizacao({ impressao: impressaoAtiva, modo: 'concluir' })
+                              }
+                            >
+                              <CheckCircleIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Registrar falha">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              aria-label="Registrar falha na impressão"
+                              onClick={() =>
+                                setFinalizacao({ impressao: impressaoAtiva, modo: 'falhar' })
+                              }
+                            >
+                              <ReportProblemIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Cancelar job">
+                            <IconButton
+                              size="small"
+                              aria-label="Cancelar job de impressão"
+                              onClick={() => setImpressaoParaCancelar(impressaoAtiva)}
+                            >
+                              <CancelIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </>
+                      ) : (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<PrintIcon />}
+                          onClick={() => setItemParaIniciar(itemPedido)}
+                        >
+                          Iniciar impressão
+                        </Button>
+                      )}
+                    </Box>
+                  )}
                 </Box>
-              ))}
+                );
+              })}
 
               <Box
                 sx={{
@@ -551,5 +677,51 @@ export function OrderFormDialog({ aberto, pedidoId, onFechar }: OrderFormDialogP
         </DialogActions>
       </form>
     </Dialog>
+
+    {pedido && (
+      <>
+        <PrintStartDialog
+          aberto={itemParaIniciar !== null}
+          onFechar={() => setItemParaIniciar(null)}
+          predefinido={
+            itemParaIniciar
+              ? {
+                  pedidoId: pedido.id,
+                  itemPedidoId: itemParaIniciar.id,
+                  filamentoId: itemParaIniciar.filamentoId,
+                  resumo: `${itemParaIniciar.nomePeca} — Pedido ${pedido.numero}${
+                    itemParaIniciar.filamentoNome ? ` — ${itemParaIniciar.filamentoNome}` : ''
+                  }`,
+                }
+              : undefined
+          }
+        />
+
+        <PrintFinishDialog
+          impressao={finalizacao?.impressao ?? null}
+          modo={finalizacao?.modo ?? 'concluir'}
+          pesoSugeridoG={
+            finalizacao
+              ? (pedido.itens.find((i) => i.id === finalizacao.impressao.itemPedidoId)
+                  ?.pesoEstimadoG ?? null)
+              : null
+          }
+          onFechar={() => setFinalizacao(null)}
+        />
+
+        <ConfirmDialog
+          aberto={impressaoParaCancelar !== null}
+          titulo="Cancelar impressão"
+          mensagem={`O job na impressora ${impressaoParaCancelar?.impressoraNome} será cancelado e a máquina liberada, sem consumo de estoque. Deseja continuar?`}
+          rotuloConfirmar="Cancelar job"
+          processando={cancelarImpressao.isPending}
+          onConfirmar={() =>
+            impressaoParaCancelar && cancelarImpressao.mutate(impressaoParaCancelar.id)
+          }
+          onCancelar={() => setImpressaoParaCancelar(null)}
+        />
+      </>
+    )}
+    </>
   );
 }

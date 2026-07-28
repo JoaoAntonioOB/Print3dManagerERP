@@ -30,7 +30,22 @@ createRoot(document.getElementById('root')!).render(
           </BrowserRouter>
         </AuthProvider>
       </QueryClientProvider>
-      <Toaster position="top-right" />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: '#1a222c',
+            color: '#e7edf3',
+            border: '1px solid rgba(231, 237, 243, 0.12)',
+          },
+          success: {
+            iconTheme: { primary: '#2bbbad', secondary: '#0b1e1b' },
+          },
+          error: {
+            iconTheme: { primary: '#f2867e', secondary: '#2a1210' },
+          },
+        }}
+      />
     </ThemeProvider>
   </StrictMode>,
 );
