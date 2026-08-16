@@ -251,7 +251,7 @@ export function FilamentsPage() {
                     </Box>
                   </TableCell>
                   <TableCell align="right">
-                    {filamento.custoPorKg !== null ? moeda.format(filamento.custoPorKg) : '—'}
+                    {filamento.custoPorKg != null ? moeda.format(filamento.custoPorKg) : '—'}
                   </TableCell>
                   <TableCell>
                     <Chip

@@ -32,7 +32,7 @@ class DefaultAdminPasswordWarnerTest {
     @Test
     @DisplayName("admin ativo com a senha default da V11 dispara o aviso")
     void detectaSenhaDefault() {
-        when(userRepository.findByEmail(DefaultAdminPasswordWarner.EMAIL_ADMIN))
+        when(userRepository.findByEmailIgnoreCase(DefaultAdminPasswordWarner.EMAIL_ADMIN))
                 .thenReturn(Optional.of(admin("admin123", true)));
 
         assertThat(warner.senhaDefaultEmUso()).isTrue();
@@ -41,7 +41,7 @@ class DefaultAdminPasswordWarnerTest {
     @Test
     @DisplayName("senha trocada não dispara o aviso")
     void senhaTrocadaNaoAvisa() {
-        when(userRepository.findByEmail(DefaultAdminPasswordWarner.EMAIL_ADMIN))
+        when(userRepository.findByEmailIgnoreCase(DefaultAdminPasswordWarner.EMAIL_ADMIN))
                 .thenReturn(Optional.of(admin("senha-forte-!2026", true)));
 
         assertThat(warner.senhaDefaultEmUso()).isFalse();
@@ -50,11 +50,11 @@ class DefaultAdminPasswordWarnerTest {
     @Test
     @DisplayName("admin desativado ou inexistente não dispara o aviso")
     void adminAusenteOuInativoNaoAvisa() {
-        when(userRepository.findByEmail(DefaultAdminPasswordWarner.EMAIL_ADMIN))
+        when(userRepository.findByEmailIgnoreCase(DefaultAdminPasswordWarner.EMAIL_ADMIN))
                 .thenReturn(Optional.of(admin("admin123", false)));
         assertThat(warner.senhaDefaultEmUso()).isFalse();
 
-        when(userRepository.findByEmail(DefaultAdminPasswordWarner.EMAIL_ADMIN))
+        when(userRepository.findByEmailIgnoreCase(DefaultAdminPasswordWarner.EMAIL_ADMIN))
                 .thenReturn(Optional.empty());
         assertThat(warner.senhaDefaultEmUso()).isFalse();
     }

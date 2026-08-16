@@ -225,7 +225,7 @@ export function InventoryPage() {
                   </TableCell>
                   <TableCell>{item.unidadeMedida}</TableCell>
                   <TableCell align="right">
-                    {item.custoUnitario !== null ? moeda.format(item.custoUnitario) : '—'}
+                    {item.custoUnitario != null ? moeda.format(item.custoUnitario) : '—'}
                   </TableCell>
                   <TableCell>{item.localizacao ?? '—'}</TableCell>
                   <TableCell>

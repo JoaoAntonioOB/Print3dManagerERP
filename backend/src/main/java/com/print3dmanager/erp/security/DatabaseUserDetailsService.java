@@ -20,7 +20,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        return userRepository.findByEmail(email)
+        return userRepository.findByEmailIgnoreCase(email)
                 .map(SecurityUser::new)
                 .orElseThrow(() -> new UsernameNotFoundException(
                         "Usuário não encontrado com o e-mail: " + email));

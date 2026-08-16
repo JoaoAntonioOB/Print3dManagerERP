@@ -48,7 +48,7 @@ public class UserService {
 
     @Transactional
     public UserResponse criar(UserCreateRequest request) {
-        if (userRepository.existsByEmail(request.email())) {
+        if (userRepository.existsByEmailIgnoreCase(request.email())) {
             throw new ResourceConflictException("Já existe um usuário com este e-mail.");
         }
 
@@ -59,7 +59,7 @@ public class UserService {
 
     @Transactional
     public UserResponse atualizar(Long id, UserUpdateRequest request) {
-        if (userRepository.existsByEmailAndIdNot(request.email(), id)) {
+        if (userRepository.existsByEmailIgnoreCaseAndIdNot(request.email(), id)) {
             throw new ResourceConflictException("Já existe outro usuário com este e-mail.");
         }
 
@@ -89,7 +89,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserResponse buscarPorEmail(String email) {
-        return userRepository.findByEmail(email)
+        return userRepository.findByEmailIgnoreCase(email)
                 .map(userMapper::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário", email));
     }

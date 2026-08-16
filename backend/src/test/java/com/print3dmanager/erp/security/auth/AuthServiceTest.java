@@ -78,7 +78,23 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("refresh: token expirado é rejeitado")
+    @DisplayName("refresh: reuso de token já revogado derruba TODAS as sessões do usuário")
+    void refreshComTokenReusadoRevogaTodasAsSessoes() {
+        User usuario = usuarioAtivo();
+        RefreshToken revogado = tokenValido(usuario);
+        revogado.setRevogado(true);
+        when(refreshTokenRepository.findByToken(revogado.getToken()))
+                .thenReturn(Optional.of(revogado));
+
+        assertThatThrownBy(() -> service.refresh(
+                new RefreshTokenRequest(revogado.getToken().toString())))
+                .isInstanceOf(BadCredentialsException.class);
+
+        verify(refreshTokenRepository).revogarTodosDoUsuario(usuario.getId());
+    }
+
+    @Test
+    @DisplayName("refresh: token só expirado (nunca reusado) não derruba as demais sessões")
     void refreshRejeitaTokenExpirado() {
         RefreshToken expirado = tokenValido(usuarioAtivo());
         expirado.setExpiraEm(Instant.now().minus(1, ChronoUnit.HOURS));
@@ -88,6 +104,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> service.refresh(
                 new RefreshTokenRequest(expirado.getToken().toString())))
                 .isInstanceOf(BadCredentialsException.class);
+        verify(refreshTokenRepository, never()).revogarTodosDoUsuario(any());
     }
 
     @Test

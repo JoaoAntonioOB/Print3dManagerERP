@@ -51,7 +51,7 @@ class Print3dManagerErpApplicationTests extends AbstractIntegrationTest {
     @Test
     @DisplayName("usuário admin inicial da migração V11 está semeado")
     void adminInicialSemeado() {
-        assertThat(userRepository.findByEmail("admin@print3d.com"))
+        assertThat(userRepository.findByEmailIgnoreCase("admin@print3d.com"))
                 .hasValueSatisfying(admin -> {
                     assertThat(admin.getRole()).isEqualTo(Role.ADMINISTRADOR);
                     assertThat(admin.isAtivo()).isTrue();

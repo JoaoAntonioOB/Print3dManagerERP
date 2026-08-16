@@ -8,9 +8,14 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
 
-    Optional<User> findByEmail(String email);
+    /**
+     * Busca case-insensitive: usuarios.email é único por LOWER(email)
+     * desde a V14 (índice uk_usuarios_email_lower) — o login e as
+     * checagens de duplicidade precisam seguir a mesma regra.
+     */
+    Optional<User> findByEmailIgnoreCase(String email);
 
-    boolean existsByEmail(String email);
+    boolean existsByEmailIgnoreCase(String email);
 
-    boolean existsByEmailAndIdNot(String email, Long id);
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Long id);
 }

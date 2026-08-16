@@ -97,16 +97,17 @@ public class DashboardQueryRepository {
                 .getResultList();
     }
 
-    /** Linhas (id, nome, pedidos, valor total) dos maiores clientes. */
+    /** Linhas (id, nome, pedidos, valor total) dos maiores clientes desde {@code inicio}. */
     @SuppressWarnings("unchecked")
-    public List<Object[]> topClientes(int limite) {
+    public List<Object[]> topClientes(Instant inicio, int limite) {
         return entityManager.createNativeQuery(
                         "SELECT c.id, c.nome, count(p.id), sum(p.valor_total) "
                                 + "FROM pedidos p JOIN clientes c ON c.id = p.cliente_id "
-                                + "WHERE p.status <> 'CANCELADO' "
+                                + "WHERE p.status <> 'CANCELADO' AND p.criado_em >= :inicio "
                                 + "GROUP BY c.id, c.nome "
                                 + "ORDER BY sum(p.valor_total) DESC, c.nome "
                                 + "LIMIT :limite")
+                .setParameter("inicio", inicio)
                 .setParameter("limite", limite)
                 .getResultList();
     }

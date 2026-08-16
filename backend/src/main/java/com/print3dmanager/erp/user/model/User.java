@@ -23,7 +23,8 @@ public class User extends BaseEntity {
     @Column(nullable = false, length = 120)
     private String nome;
 
-    @Column(nullable = false, length = 160, unique = true)
+    /** Único por LOWER(email) — índice funcional uk_usuarios_email_lower (V14), não uma unique constraint simples de coluna. */
+    @Column(nullable = false, length = 160)
     private String email;
 
     /** Hash BCrypt — nunca armazenar senha em texto plano. */

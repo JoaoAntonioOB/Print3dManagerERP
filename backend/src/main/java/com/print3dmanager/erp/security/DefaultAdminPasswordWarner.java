@@ -37,7 +37,7 @@ public class DefaultAdminPasswordWarner implements ApplicationRunner {
 
     /** O admin semeado existe, está ativo e ainda autentica com a senha default? */
     boolean senhaDefaultEmUso() {
-        return userRepository.findByEmail(EMAIL_ADMIN)
+        return userRepository.findByEmailIgnoreCase(EMAIL_ADMIN)
                 .filter(admin -> admin.isAtivo()
                         && passwordEncoder.matches(SENHA_DEFAULT, admin.getSenha()))
                 .isPresent();

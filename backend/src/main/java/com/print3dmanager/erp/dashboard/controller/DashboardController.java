@@ -69,10 +69,14 @@ public class DashboardController {
 
     @GetMapping("/top-clientes")
     @PreAuthorize(PODE_CONSULTAR)
-    @Operation(summary = "Maiores clientes por valor total de pedidos (cancelados fora)")
+    @Operation(summary = "Maiores clientes por valor total de pedidos (cancelados fora)",
+            description = "Considera apenas pedidos abertos dentro da janela de meses "
+                    + "informada (1–60, incluindo o corrente).")
     public List<TopClientPoint> topClientes(
+            @Parameter(description = "Quantidade de meses (1–60, incluindo o corrente)")
+            @RequestParam(defaultValue = "12") int meses,
             @Parameter(description = "Quantidade de clientes (1–50)")
             @RequestParam(defaultValue = "5") int limite) {
-        return dashboardService.topClientes(limite);
+        return dashboardService.topClientes(meses, limite);
     }
 }

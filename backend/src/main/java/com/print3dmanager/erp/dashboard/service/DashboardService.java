@@ -116,9 +116,10 @@ public class DashboardService {
     }
 
     @Transactional(readOnly = true)
-    public List<TopClientPoint> topClientes(int limite) {
+    public List<TopClientPoint> topClientes(int meses, int limite) {
         int limiteEfetivo = Math.clamp(limite, 1, LIMITE_CLIENTES_MAX);
-        return dashboardQueryRepository.topClientes(limiteEfetivo).stream()
+        Instant inicio = inicioDaJanela(janelaDeMeses(meses));
+        return dashboardQueryRepository.topClientes(inicio, limiteEfetivo).stream()
                 .map(linha -> new TopClientPoint(
                         ((Number) linha[0]).longValue(),
                         (String) linha[1],

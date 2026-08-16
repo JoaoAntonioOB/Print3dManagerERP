@@ -44,6 +44,9 @@ public class AuthService {
     /**
      * Rotação de refresh token: o token usado é revogado e um novo par
      * access/refresh é emitido. Token reutilizado ou expirado → 401.
+     * Reuso de um token já revogado (rotação já havia acontecido antes)
+     * é sinal de token roubado: todas as sessões do usuário são revogadas
+     * (mesma mensagem de erro ao cliente, para não vazar o motivo).
      */
     @Transactional
     public AuthResponse refresh(RefreshTokenRequest request) {
@@ -51,6 +54,9 @@ public class AuthService {
                 .orElseThrow(() -> new BadCredentialsException(MSG_TOKEN_INVALIDO));
 
         if (!atual.isValido()) {
+            if (atual.isRevogado()) {
+                refreshTokenRepository.revogarTodosDoUsuario(atual.getUsuario().getId());
+            }
             throw new BadCredentialsException(MSG_TOKEN_INVALIDO);
         }
 
