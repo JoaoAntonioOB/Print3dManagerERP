@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -40,6 +41,8 @@ class OrderBillingServiceTest {
     private FinancialTransactionMapper financialTransactionMapper;
     @Mock
     private OrderRepository orderRepository;
+    @Mock
+    private ReceitaTransactionWriter receitaTransactionWriter;
 
     @InjectMocks
     private OrderBillingService service;
@@ -51,14 +54,14 @@ class OrderBillingServiceTest {
         when(orderRepository.findById(5L)).thenReturn(Optional.of(pedido));
         when(financialTransactionRepository.existsByPedidoIdAndTipoAndStatusNot(
                 5L, TransactionType.RECEITA, TransactionStatus.CANCELADA)).thenReturn(false);
-        when(financialTransactionRepository.save(any(FinancialTransaction.class)))
+        when(receitaTransactionWriter.salvar(any(FinancialTransaction.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
         service.faturar(5L);
 
         ArgumentCaptor<FinancialTransaction> captor =
                 ArgumentCaptor.forClass(FinancialTransaction.class);
-        verify(financialTransactionRepository).save(captor.capture());
+        verify(receitaTransactionWriter).salvar(captor.capture());
         FinancialTransaction receita = captor.getValue();
         assertThat(receita.getTipo()).isEqualTo(TransactionType.RECEITA);
         assertThat(receita.getStatus()).isEqualTo(TransactionStatus.PENDENTE);
@@ -78,14 +81,14 @@ class OrderBillingServiceTest {
         when(orderRepository.findById(5L)).thenReturn(Optional.of(pedido));
         when(financialTransactionRepository.existsByPedidoIdAndTipoAndStatusNot(
                 any(), any(), any())).thenReturn(false);
-        when(financialTransactionRepository.save(any(FinancialTransaction.class)))
+        when(receitaTransactionWriter.salvar(any(FinancialTransaction.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
         service.faturar(5L);
 
         ArgumentCaptor<FinancialTransaction> captor =
                 ArgumentCaptor.forClass(FinancialTransaction.class);
-        verify(financialTransactionRepository).save(captor.capture());
+        verify(receitaTransactionWriter).salvar(captor.capture());
         assertThat(captor.getValue().getDataTransacao()).isEqualTo(LocalDate.of(2026, 6, 10));
     }
 
@@ -110,7 +113,7 @@ class OrderBillingServiceTest {
 
         assertThatThrownBy(() -> service.faturar(5L))
                 .isInstanceOf(ResourceConflictException.class);
-        verify(financialTransactionRepository, never()).save(any());
+        verify(receitaTransactionWriter, never()).salvar(any());
     }
 
     @Test
@@ -136,6 +139,39 @@ class OrderBillingServiceTest {
     }
 
     @Test
+    @DisplayName("faturar: adquire o advisory lock do pedido antes do check-then-act")
+    void faturarAdquireLockAntesDeChecar() {
+        when(orderRepository.findById(5L))
+                .thenReturn(Optional.of(pedido(OrderStatus.CONCLUIDO, "100.00")));
+        when(financialTransactionRepository.existsByPedidoIdAndTipoAndStatusNot(
+                5L, TransactionType.RECEITA, TransactionStatus.CANCELADA)).thenReturn(false);
+        when(receitaTransactionWriter.salvar(any(FinancialTransaction.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.faturar(5L);
+
+        verify(financialTransactionRepository).travarFaturamento(5L);
+    }
+
+    @Test
+    @DisplayName("faturar: violação da constraint única (corrida vencida por outra "
+            + "transação) vira 409, não 500")
+    void faturarConflitoDeCorridaViraConflito409() {
+        when(orderRepository.findById(5L))
+                .thenReturn(Optional.of(pedido(OrderStatus.CONCLUIDO, "100.00")));
+        when(financialTransactionRepository.existsByPedidoIdAndTipoAndStatusNot(
+                5L, TransactionType.RECEITA, TransactionStatus.CANCELADA)).thenReturn(false);
+        when(receitaTransactionWriter.salvar(any(FinancialTransaction.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "duplicate key value violates unique constraint "
+                                + "\"uq_transacoes_receita_ativa_por_pedido\""));
+
+        assertThatThrownBy(() -> service.faturar(5L))
+                .isInstanceOf(ResourceConflictException.class)
+                .hasMessageContaining("já possui uma receita vinculada");
+    }
+
+    @Test
     @DisplayName("entrega automática: silenciosa quando o pedido já foi faturado")
     void geracaoAutomaticaSilenciosaQuandoJaFaturado() {
         Order pedido = pedido(OrderStatus.ENTREGUE, "100.00");
@@ -144,7 +180,7 @@ class OrderBillingServiceTest {
 
         service.gerarReceitaSeNecessario(pedido);
 
-        verify(financialTransactionRepository, never()).save(any());
+        verify(receitaTransactionWriter, never()).salvar(any());
     }
 
     @Test
@@ -152,7 +188,7 @@ class OrderBillingServiceTest {
     void geracaoAutomaticaSilenciosaSemValor() {
         service.gerarReceitaSeNecessario(pedido(OrderStatus.ENTREGUE, "0.00"));
 
-        verify(financialTransactionRepository, never()).save(any());
+        verify(receitaTransactionWriter, never()).salvar(any());
     }
 
     @Test
@@ -161,15 +197,32 @@ class OrderBillingServiceTest {
         Order pedido = pedido(OrderStatus.ENTREGUE, "200.00");
         when(financialTransactionRepository.existsByPedidoIdAndTipoAndStatusNot(
                 5L, TransactionType.RECEITA, TransactionStatus.CANCELADA)).thenReturn(false);
-        when(financialTransactionRepository.save(any(FinancialTransaction.class)))
+        when(receitaTransactionWriter.salvar(any(FinancialTransaction.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
         service.gerarReceitaSeNecessario(pedido);
 
         ArgumentCaptor<FinancialTransaction> captor =
                 ArgumentCaptor.forClass(FinancialTransaction.class);
-        verify(financialTransactionRepository).save(captor.capture());
+        verify(receitaTransactionWriter).salvar(captor.capture());
         assertThat(captor.getValue().getValor()).isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    @DisplayName("entrega automática: violação da constraint única (corrida) é "
+            + "absorvida silenciosamente, igual a já faturado")
+    void geracaoAutomaticaAbsorveConflitoDeCorridaSilenciosamente() {
+        Order pedido = pedido(OrderStatus.ENTREGUE, "200.00");
+        when(financialTransactionRepository.existsByPedidoIdAndTipoAndStatusNot(
+                5L, TransactionType.RECEITA, TransactionStatus.CANCELADA)).thenReturn(false);
+        when(receitaTransactionWriter.salvar(any(FinancialTransaction.class)))
+                .thenThrow(new DataIntegrityViolationException(
+                        "duplicate key value violates unique constraint "
+                                + "\"uq_transacoes_receita_ativa_por_pedido\""));
+
+        service.gerarReceitaSeNecessario(pedido);
+
+        verify(financialTransactionRepository).travarFaturamento(5L);
     }
 
     private Order pedido(OrderStatus status, String valorTotal) {

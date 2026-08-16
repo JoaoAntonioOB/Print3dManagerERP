@@ -3,6 +3,9 @@ package com.print3dmanager.erp.printer.service;
 import com.print3dmanager.erp.common.dto.PageResponse;
 import com.print3dmanager.erp.common.exception.BusinessException;
 import com.print3dmanager.erp.common.exception.ResourceNotFoundException;
+import com.print3dmanager.erp.order.model.PrintHistory;
+import com.print3dmanager.erp.order.model.PrintStatus;
+import com.print3dmanager.erp.order.repository.PrintHistoryRepository;
 import com.print3dmanager.erp.printer.dto.PrinterCreateRequest;
 import com.print3dmanager.erp.printer.dto.PrinterResponse;
 import com.print3dmanager.erp.printer.dto.PrinterUpdateRequest;
@@ -16,6 +19,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 /**
  * Regras de negócio de impressoras: CRUD com soft delete e controle
  * da situação operacional (status).
@@ -26,6 +31,7 @@ public class PrinterService {
 
     private final PrinterRepository printerRepository;
     private final PrinterMapper printerMapper;
+    private final PrintHistoryRepository printHistoryRepository;
 
     @Transactional(readOnly = true)
     public PageResponse<PrinterResponse> listar(String busca, PrinterStatus status, Boolean ativo,
@@ -61,6 +67,12 @@ public class PrinterService {
             throw new BusinessException(
                     "Não é possível alterar o status de uma impressora desativada.");
         }
+        buscarJobEmAndamento(impressora).ifPresent(job -> {
+            throw new BusinessException(
+                    ("Não é possível alterar o status da impressora %s: há uma impressão em "
+                            + "andamento (job #%d).")
+                            .formatted(impressora.getNome(), job.getId()));
+        });
         impressora.setStatus(novoStatus);
         return printerMapper.toResponse(impressora);
     }
@@ -69,8 +81,25 @@ public class PrinterService {
     @Transactional
     public void desativar(Long id) {
         Printer impressora = obterImpressora(id);
+        buscarJobEmAndamento(impressora).ifPresent(job -> {
+            throw new BusinessException(
+                    ("Não é possível desativar a impressora %s: há uma impressão em andamento "
+                            + "(job #%d).")
+                            .formatted(impressora.getNome(), job.getId()));
+        });
         impressora.setAtivo(false);
         impressora.setStatus(PrinterStatus.INATIVA);
+    }
+
+    /**
+     * Impede "esquecer" um job ativo numa impressora que teve o status
+     * alterado/desativada por outro caminho: bloqueia a transição em vez de
+     * cancelar o job escondido (rejeitar é mais simples e consistente com o
+     * restante do sistema).
+     */
+    private Optional<PrintHistory> buscarJobEmAndamento(Printer impressora) {
+        return printHistoryRepository.findFirstByImpressoraIdAndStatus(
+                impressora.getId(), PrintStatus.EM_ANDAMENTO);
     }
 
     @Transactional

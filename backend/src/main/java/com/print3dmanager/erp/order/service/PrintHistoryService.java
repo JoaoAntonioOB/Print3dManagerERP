@@ -71,7 +71,10 @@ public class PrintHistoryService {
 
     @Transactional
     public PrintHistoryResponse iniciar(PrintStartRequest request, Long usuarioId) {
-        Printer impressora = obterImpressora(request.impressoraId());
+        // Lock pessimista: a checagem de DISPONIVEL e a escrita de IMPRIMINDO
+        // precisam ser atômicas para duas chamadas concorrentes não ocuparem
+        // a mesma impressora com dois jobs simultâneos.
+        Printer impressora = obterImpressoraParaOcupar(request.impressoraId());
         if (!impressora.isAtivo()) {
             throw new BusinessException(
                     "A impressora %s está desativada.".formatted(impressora.getNome()));
@@ -172,11 +175,19 @@ public class PrintHistoryService {
     }
 
     private void consumirFilamento(PrintHistory job) {
-        Filament filamento = job.getFilamento();
+        Filament filamentoDoJob = job.getFilamento();
         BigDecimal peso = job.getPesoUtilizadoG();
-        if (filamento == null || peso == null) {
+        if (filamentoDoJob == null || peso == null) {
             return;
         }
+        // job.getFilamento() já veio carregado (sem lock) pelo entity graph
+        // de findDetalhadoById; recarrega com lock pessimista antes de ler o
+        // saldo para garantir que leitura e gravação sejam atômicas frente a
+        // outro job finalizando o mesmo filamento (ou uma movimentação
+        // manual concorrente via PATCH /filaments/{id}/estoque).
+        Filament filamento = filamentRepository.findByIdForUpdate(filamentoDoJob.getId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Filamento", filamentoDoJob.getId()));
         BigDecimal novoSaldo = filamento.getQuantidadeEstoqueG().subtract(peso);
         if (novoSaldo.signum() < 0) {
             throw new BusinessException(
@@ -229,8 +240,8 @@ public class PrintHistoryService {
         return calculavel ? custo.setScale(2, RoundingMode.HALF_UP) : null;
     }
 
-    private Printer obterImpressora(Long id) {
-        return printerRepository.findById(id)
+    private Printer obterImpressoraParaOcupar(Long id) {
+        return printerRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Impressora", id));
     }
 

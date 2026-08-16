@@ -33,12 +33,22 @@ server:
     context-path: /api
   # Atrás do NGINX todos os clientes chegariam com o IP do proxy — o
   # RemoteIpValve troca o remote address pelo X-Forwarded-For quando o
-  # peer direto é um proxy interno (faixas privadas, caso da rede Docker),
-  # mantendo o rate limit e os logs por IP real do cliente.
+  # peer direto é um proxy interno confiável, mantendo o rate limit e os
+  # logs por IP real do cliente. IMPORTANTE: internal-proxies é restrito ao
+  # IP FIXO do container "frontend"/NGINX na print3d-network (ver
+  # docker-compose.yml, TOMCAT_INTERNAL_PROXIES) — não a sub-rede inteira.
+  # O default amplo do Tomcat (10/8, 172.16/12, 192.168/16 inteiros), ou
+  # mesmo um regex cobrindo o /24 da rede Docker, faz o GATEWAY da rede
+  # (usado pelo Docker para NAT de conexões publicadas no host) também
+  # ser tratado como proxy confiável — validado ao vivo: com isso, dava
+  # pra forjar X-Forwarded-For e furar o rate limiting mesmo pela porta 80
+  # (NGINX legítimo). Restrito ao IP exato do NGINX, qualquer outro peer
+  # (inclusive o gateway) já é tratado como cliente final.
   tomcat:
     remoteip:
       remote-ip-header: x-forwarded-for
       protocol-header: x-forwarded-proto
+      internal-proxies: ${TOMCAT_INTERNAL_PROXIES:172\.28\.5\.10}
   error:
     include-message: always
     include-stacktrace: never

@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 
@@ -33,6 +34,8 @@ public class ReportService {
     private static final Locale PT_BR = Locale.of("pt", "BR");
     private static final DateTimeFormatter FORMATO_ARQUIVO =
             DateTimeFormatter.ofPattern("yyyyMMdd");
+    /** Teto do intervalo do relatório — evita full scan/geração em memória sem limite. */
+    private static final long MAX_DIAS_PERIODO = 366;
 
     private final ReportQueryRepository reportQueryRepository;
     private final FinancialTransactionService financialTransactionService;
@@ -171,6 +174,11 @@ public class ReportService {
         if (inicio.isAfter(fim)) {
             throw new BusinessException(
                     "O início do período (de) não pode ser posterior ao fim (ate).");
+        }
+        if (ChronoUnit.DAYS.between(inicio, fim) + 1 > MAX_DIAS_PERIODO) {
+            throw new BusinessException(
+                    "O período do relatório não pode exceder %d dias."
+                            .formatted(MAX_DIAS_PERIODO));
         }
         return new Periodo(inicio, fim,
                 inicio.atStartOfDay(ZoneOffset.UTC).toInstant(),

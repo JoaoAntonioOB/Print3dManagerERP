@@ -11,9 +11,28 @@ spring:
     show-sql: false
 
 server:
-  forward-headers-strategy: framework
+  # NATIVE (não FRAMEWORK): usa o RemoteIpValve do Tomcat, que só confia no
+  # X-Forwarded-For quando o peer direto bate com server.tomcat.remoteip.
+  # internal-proxies. O ForwardedHeaderFilter do Spring (estratégia
+  # "framework") reescreve getRemoteAddr()/scheme/host a partir do header
+  # SEM checar quem é o peer — qualquer um que fale com o backend podia
+  # forjar X-Forwarded-For e furar o rate limit por IP mesmo com
+  # internal-proxies restrito (causa raiz real do bypass, achado crítico
+  # da auditoria de 2026-08-16: o internal-proxies nunca chegava a ser
+  # avaliado, porque a valve nativa nem estava em uso).
+  forward-headers-strategy: native
 
 logging:
   level:
     com.print3dmanager.erp: INFO
     org.hibernate.SQL: WARN
+
+application:
+  security:
+    jwt:
+      # Sem default (ao contrário do application.yml base, que mantém um valor
+      # de conveniência para dev/test): em produção, subir sem JWT_SECRET
+      # setado deve falhar rápido, no mesmo padrão de spring.datasource.password
+      # acima — nunca aceitar o segredo de desenvolvimento (decodificável de
+      # Base64) como fallback silencioso.
+      secret: ${JWT_SECRET}

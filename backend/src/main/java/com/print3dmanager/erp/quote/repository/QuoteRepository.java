@@ -38,4 +38,17 @@ public interface QuoteRepository
     @Query(value = "SELECT pg_advisory_xact_lock(hashtext('orcamentos_numero_' || :ano))",
             nativeQuery = true)
     void travarGeracaoNumero(@Param("ano") int ano);
+
+    /**
+     * Serializa a conversão de um mesmo orçamento em pedido via advisory
+     * lock transacional do Postgres — evita que duas chamadas concorrentes
+     * (duplo clique, retries) para o mesmo orçamento passem ao mesmo tempo
+     * pelo check-then-act de status APROVADO em {@code converter()} e
+     * gerem dois pedidos cobráveis. Namespace próprio (diferente do usado
+     * na geração de número) para não colidir com locks de outro propósito.
+     * Liberado automaticamente no commit/rollback.
+     */
+    @Query(value = "SELECT pg_advisory_xact_lock(hashtext('orcamento_conversao_' "
+            + "|| :orcamentoId))", nativeQuery = true)
+    void travarConversao(@Param("orcamentoId") Long orcamentoId);
 }

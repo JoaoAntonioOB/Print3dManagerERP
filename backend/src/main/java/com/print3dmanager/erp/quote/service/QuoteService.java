@@ -175,6 +175,14 @@ public class QuoteService {
      */
     @Transactional
     public OrderResponse converter(Long id, Long usuarioId) {
+        // Serializa a conversão deste orçamento: qualquer chamada concorrente
+        // (duplo clique, retries) para o mesmo id fica bloqueada aqui até o
+        // commit/rollback da conversão em andamento. O orçamento só é
+        // carregado DEPOIS do lock para que o check-then-act abaixo enxergue
+        // o status já commitado por uma conversão concorrente que tenha
+        // vencido a corrida (evita duas criações de pedido para o mesmo
+        // orçamento).
+        quoteRepository.travarConversao(id);
         Quote orcamento = obterOrcamentoDetalhado(id);
         if (orcamento.getStatus() != QuoteStatus.APROVADO) {
             throw new BusinessException(

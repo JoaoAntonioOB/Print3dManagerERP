@@ -8,9 +8,27 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-print3d_manager}
       POSTGRES_USER: ${POSTGRES_USER:-print3d}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-print3d}
+      # Sem default fraco de propósito: "print3d" era previsível e ficava
+      # valendo mesmo sem .env (achado ALTO da auditoria de 2026-08-16).
+      # A sintaxe ${VAR:?msg} falha o "docker compose config"/"up" com uma
+      # mensagem clara se a variável não estiver definida (fail-fast), em
+      # vez de deixar o Postgres subir com uma senha adivinhável. Copie
+      # .env.example para .env e defina um valor real antes de subir a
+      # stack (ver README "Desenvolvimento local sem Docker" para o caso
+      # de só precisar de um Postgres local para o `mvnw`/dev profile).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env (cp .env.example .env) - sem default por seguranca}
     ports:
-      - "5432:5432"
+      # Publicado só em loopback (127.0.0.1), não em 0.0.0.0: o backend
+      # fala com o Postgres pela rede interna do compose (host "postgres"),
+      # então isso NÃO é necessário para a stack funcionar. Mantido restrito
+      # ao host local (em vez de removido, como foi feito com a porta 8080
+      # do backend) porque há um fluxo de dev legítimo e documentado no
+      # README ("Desenvolvimento local sem Docker") em que o backend roda
+      # via `mvnw`/`mvn spring-boot:run` diretamente no host (fora de
+      # container) e precisa alcançar este Postgres em localhost:5432.
+      # Achado ALTO da auditoria de 2026-08-16: antes publicava em 0.0.0.0,
+      # alcançável de fora da máquina.
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -32,14 +50,45 @@ services:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-print3d_manager}
       DATABASE_USERNAME: ${POSTGRES_USER:-print3d}
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-print3d}
-      JWT_SECRET: ${JWT_SECRET:-cHJpbnQzZC1tYW5hZ2VyLWVycC1kZXYtc2VjcmV0LWtleS0yNTYtYml0cy1taW5pbXVtLXNpemU=}
+      # Mesma variável POSTGRES_PASSWORD do serviço "postgres" acima (já
+      # obrigatória via ${VAR:?msg}); repetido aqui só por defensividade
+      # (garante a mesma mensagem de erro mesmo se a ordem de parsing mudar).
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env (cp .env.example .env) - sem default por seguranca}
+      # Sem default hardcoded de propósito (achado ALTO #9 da auditoria de
+      # 2026-08-16, achado irmão do #8/JWT_SECRET tratado em paralelo no
+      # backend): um fallback aqui no compose faria o Tomcat SEMPRE receber
+      # um JWT_SECRET não-nulo (mesmo sem .env), o que mascararia/anularia
+      # qualquer validação fail-fast adicionada em application-prod.yml —
+      # a env var chegaria "preenchida" pelo compose antes mesmo do Spring
+      # decidir se o valor está ausente. Gere um valor real com
+      # `openssl rand -base64 48` e coloque em .env.
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env (openssl rand -base64 48) - sem default por seguranca}
       JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION:-900000}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:-604800000}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost}
       UPLOAD_DIR: /app/uploads
-    ports:
-      - "8080:8080"
+      # Regex (RemoteIpValve.internalProxies) que restringe QUEM pode alimentar
+      # o X-Forwarded-For confiável: SÓ o IP fixo do container "frontend"
+      # (172.28.5.10, ver serviço frontend abaixo) — não a sub-rede inteira.
+      # Isso importa porque o gateway da rede (172.28.5.1) é o IP que o
+      # Docker usa para fazer NAT das conexões publicadas no host (ex.:
+      # curl em localhost:80): se internal-proxies cobrisse o /24 inteiro,
+      # o gateway também seria "confiável" e o Tomcat continuaria descendo
+      # a cadeia do X-Forwarded-For até aceitar um valor forjado pelo
+      # cliente — validado ao vivo nesta auditoria (spoof funcionava mesmo
+      # com internal-proxies = 172.28.5.*). Restringindo ao IP exato do
+      # NGINX, qualquer peer fora dele (inclusive o gateway) já é tratado
+      # como "cliente final" e o Tomcat para de descer a cadeia ali,
+      # ignorando qualquer X-Forwarded-For forjado à esquerda.
+      TOMCAT_INTERNAL_PROXIES: ${TOMCAT_INTERNAL_PROXIES:-172\.28\.5\.10}
+    # Porta 8080 NÃO publicada no host de propósito: o backend só deve ser
+    # alcançável pela rede interna do compose (print3d-network), via o
+    # nome de serviço "backend". Publicar 8080:8080 aqui permitia bater
+    # direto no backend contornando o NGINX e, junto com o RemoteIpValve
+    # (que confia no X-Forwarded-For vindo de peers da rede Docker), permitia
+    # forjar o IP de origem e furar o rate limiting por IP (achado crítico
+    # da auditoria de 2026-08-16). Para depurar localmente, use
+    # `docker compose exec backend sh` ou acesse via NGINX em /api.
     volumes:
       - backend-uploads:/app/uploads
     depends_on:
@@ -59,7 +108,12 @@ services:
     depends_on:
       - backend
     networks:
-      - print3d-network
+      print3d-network:
+        # IP fixo: é o valor exato que o backend confia em
+        # server.tomcat.remoteip.internal-proxies (TOMCAT_INTERNAL_PROXIES).
+        # Sem fixar, a ordem de criação dos containers poderia mudar o IP
+        # atribuído entre subidas e quebrar essa confiança silenciosamente.
+        ipv4_address: 172.28.5.10
 
 volumes:
   postgres-data:
@@ -68,3 +122,11 @@ volumes:
 networks:
   print3d-network:
     driver: bridge
+    # Sub-rede FIXA (em vez de deixar o Docker atribuir automaticamente):
+    # o backend usa esse range em server.tomcat.remoteip.internal-proxies
+    # (via TOMCAT_INTERNAL_PROXIES) para decidir em quem confiar o
+    # X-Forwarded-For — uma sub-rede que muda a cada "docker compose up"
+    # quebraria essa configuração silenciosamente.
+    ipam:
+      config:
+        - subnet: 172.28.5.0/24

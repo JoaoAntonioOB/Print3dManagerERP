@@ -4,6 +4,7 @@ import com.print3dmanager.erp.common.dto.ApiErrorResponse;
 import com.print3dmanager.erp.common.dto.ApiErrorResponse.FieldValidationError;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -97,6 +98,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleConflito(ResourceConflictException ex,
                                                            HttpServletRequest request) {
         return construir(HttpStatus.CONFLICT, ex.getMessage(), request, null);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleIntegridadeDeDados(
+            DataIntegrityViolationException ex, HttpServletRequest request) {
+        // Cobre violação de FK/unique não tratada explicitamente no service (ex.:
+        // exclusão física de registro ainda referenciado por outra tabela) — erro
+        // de negócio legítimo do usuário, não deve virar 500.
+        log.warn("Violação de integridade de dados em {} {}: {}", request.getMethod(),
+                request.getRequestURI(), ex.getMessage());
+        return construir(HttpStatus.CONFLICT,
+                "Não é possível excluir este registro: ele está vinculado a outros dados "
+                        + "do sistema.", request, null);
     }
 
     @ExceptionHandler(PropertyReferenceException.class)

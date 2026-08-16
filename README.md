@@ -93,6 +93,25 @@ npm install
 npm run dev
 ```
 
+O profile `dev` do backend (`application-dev.yml`) já assume um Postgres em
+`localhost:5432` com usuário/senha `print3d`/`print3d` (só para essa
+conveniência local — nunca use essas credenciais fora da sua máquina). O
+jeito mais simples de ter esse Postgres rodando é subir só o serviço via
+Docker Compose, definindo `POSTGRES_USER`/`POSTGRES_PASSWORD`/`POSTGRES_DB`
+como `print3d`/`print3d`/`print3d_manager` no seu `.env` (essas variáveis
+são **obrigatórias** no `docker-compose.yml` — sem default, por segurança):
+
+```bash
+cp .env.example .env   # ajuste POSTGRES_PASSWORD para "print3d" se for usar mvn spring-boot:run localmente
+docker compose up -d postgres
+cd backend
+mvn spring-boot:run
+```
+
+A porta 5432 do Postgres é publicada só em `127.0.0.1` (loopback), não em
+`0.0.0.0` — acessível do seu host para esse fluxo, mas não de fora da
+máquina.
+
 ## Roadmap de implementação
 
 1. ✅ Estrutura do projeto

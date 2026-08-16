@@ -70,7 +70,7 @@ class PrintHistoryServiceTest {
     @DisplayName("iniciar: impressora DISPONIVEL fica IMPRIMINDO e o job nasce EM_ANDAMENTO")
     void iniciarOcupaImpressora() {
         Printer impressora = impressora(PrinterStatus.DISPONIVEL, true);
-        when(printerRepository.findById(1L)).thenReturn(Optional.of(impressora));
+        when(printerRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(impressora));
         when(userRepository.getReferenceById(9L)).thenReturn(usuario(9L));
         stubSalvarERecarregar();
 
@@ -85,7 +85,7 @@ class PrintHistoryServiceTest {
     @Test
     @DisplayName("iniciar: impressora ocupada não aceita segundo job simultâneo")
     void iniciarRejeitaImpressoraOcupada() {
-        when(printerRepository.findById(1L))
+        when(printerRepository.findByIdForUpdate(1L))
                 .thenReturn(Optional.of(impressora(PrinterStatus.IMPRIMINDO, true)));
 
         assertThatThrownBy(() -> service.iniciar(
@@ -98,7 +98,7 @@ class PrintHistoryServiceTest {
     @Test
     @DisplayName("iniciar: impressora desativada é rejeitada")
     void iniciarRejeitaImpressoraDesativada() {
-        when(printerRepository.findById(1L))
+        when(printerRepository.findByIdForUpdate(1L))
                 .thenReturn(Optional.of(impressora(PrinterStatus.DISPONIVEL, false)));
 
         assertThatThrownBy(() -> service.iniciar(
@@ -110,7 +110,7 @@ class PrintHistoryServiceTest {
     @Test
     @DisplayName("iniciar: item de pedido exige pedido EM_PRODUCAO")
     void iniciarExigePedidoEmProducao() {
-        when(printerRepository.findById(1L))
+        when(printerRepository.findByIdForUpdate(1L))
                 .thenReturn(Optional.of(impressora(PrinterStatus.DISPONIVEL, true)));
         OrderItem item = new OrderItem();
         Order pedido = new Order();
@@ -133,6 +133,7 @@ class PrintHistoryServiceTest {
         Filament filamento = filamento("90.00", "500.00");
         PrintHistory job = jobEmAndamento(filamento);
         when(printHistoryRepository.findDetalhadoById(10L)).thenReturn(Optional.of(job));
+        when(filamentRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(filamento));
         when(printerConfigurationService.buscarEfetivaOpcional(1L))
                 .thenReturn(Optional.of(configuracao("1.00", "10.00", "2.00")));
 
@@ -172,6 +173,7 @@ class PrintHistoryServiceTest {
         Filament filamento = filamento("90.00", "500.00");
         PrintHistory job = jobEmAndamento(filamento);
         when(printHistoryRepository.findDetalhadoById(10L)).thenReturn(Optional.of(job));
+        when(filamentRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(filamento));
         when(printerConfigurationService.buscarEfetivaOpcional(1L)).thenReturn(Optional.empty());
 
         PrintFailRequest request = new PrintFailRequest("Peça descolou da mesa",
@@ -190,6 +192,7 @@ class PrintHistoryServiceTest {
         Filament filamento = filamento("90.00", "50.00");
         PrintHistory job = jobEmAndamento(filamento);
         when(printHistoryRepository.findDetalhadoById(10L)).thenReturn(Optional.of(job));
+        when(filamentRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(filamento));
 
         assertThatThrownBy(() -> service.concluir(10L, new PrintCompleteRequest(
                 INICIO.plus(60, ChronoUnit.MINUTES), new BigDecimal("100"), null, null)))

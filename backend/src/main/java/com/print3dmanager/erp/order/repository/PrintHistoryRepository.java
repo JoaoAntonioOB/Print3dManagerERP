@@ -1,6 +1,7 @@
 package com.print3dmanager.erp.order.repository;
 
 import com.print3dmanager.erp.order.model.PrintHistory;
+import com.print3dmanager.erp.order.model.PrintStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -22,4 +23,12 @@ public interface PrintHistoryRepository
     @EntityGraph(attributePaths =
             {"impressora", "filamento", "itemPedido", "itemPedido.pedido", "usuario"})
     Optional<PrintHistory> findDetalhadoById(Long id);
+
+    /**
+     * Job ativo (se houver) de uma impressora — usado para bloquear troca de
+     * status/desativação enquanto há uma impressão EM_ANDAMENTO na máquina,
+     * evitando "esquecer" um job cujo período deixaria de refletir a
+     * realidade física.
+     */
+    Optional<PrintHistory> findFirstByImpressoraIdAndStatus(Long impressoraId, PrintStatus status);
 }

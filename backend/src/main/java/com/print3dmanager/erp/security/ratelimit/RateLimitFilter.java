@@ -48,6 +48,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         String chave = grupoDe(request) + ":" + request.getRemoteAddr();
+        log.debug("Rate limit check chave={} xForwardedFor={}", chave,
+                request.getHeader("X-Forwarded-For"));
         if (rateLimitService.permitir(chave, limite, properties.janelaSegundos())) {
             filterChain.doFilter(request, response);
             return;

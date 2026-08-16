@@ -62,7 +62,11 @@ public class FilamentService {
 
     @Transactional
     public FilamentResponse movimentarEstoque(Long id, FilamentStockRequest request) {
-        Filament filamento = obterFilamento(id);
+        // Lock pessimista: leitura e gravação do saldo precisam ser atômicas
+        // em relação a outra movimentação manual ou a um job de impressão
+        // finalizando o mesmo filamento ao mesmo tempo (evita lost update).
+        Filament filamento = filamentRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Filamento", id));
         if (!filamento.isAtivo()) {
             throw new BusinessException(
                     "Não é possível movimentar o estoque de um filamento desativado.");

@@ -19,16 +19,38 @@ import { ROTULOS_STATUS_PEDIDO, type OrderStatus } from '../../api/orders';
 import { baixarRelatorio, type TipoRelatorio } from '../../api/reports';
 import { useAuth } from '../../auth/AuthContext';
 
+/** Teto de dias por período, espelhando o limite aplicado em ReportService.resolverPeriodo() no backend. */
+const LIMITE_DIAS_PERIODO = 366;
+
+const formatarIso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+    d.getDate(),
+  ).padStart(2, '0')}`;
+
 /** Primeiro e último dia do mês corrente, em ISO (mesmo default do backend). */
 function mesCorrente(): { de: string; ate: string } {
   const agora = new Date();
   const de = new Date(agora.getFullYear(), agora.getMonth(), 1);
   const ate = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
-  const iso = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-      d.getDate(),
-    ).padStart(2, '0')}`;
-  return { de: iso(de), ate: iso(ate) };
+  return { de: formatarIso(de), ate: formatarIso(ate) };
+}
+
+/** Data máxima permitida para o fim do período, dado o início (respeitando o teto de dias). */
+function ateMaximo(de: string): string | undefined {
+  if (!de) return undefined;
+  const inicio = new Date(`${de}T00:00:00`);
+  if (Number.isNaN(inicio.getTime())) return undefined;
+  const maximo = new Date(inicio);
+  maximo.setDate(maximo.getDate() + (LIMITE_DIAS_PERIODO - 1));
+  return formatarIso(maximo);
+}
+
+/** Quantidade de dias (inclusive) entre duas datas ISO (yyyy-MM-dd). */
+function diasNoPeriodo(de: string, ate: string): number {
+  const inicio = new Date(`${de}T00:00:00`);
+  const fim = new Date(`${ate}T00:00:00`);
+  const diffMs = fim.getTime() - inicio.getTime();
+  return Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
 }
 
 function CartaoRelatorio({
@@ -89,6 +111,12 @@ export function ReportsPage() {
       toast.error('O início do período não pode ser depois do fim.');
       return;
     }
+    if (de && ate && diasNoPeriodo(de, ate) > LIMITE_DIAS_PERIODO) {
+      toast.error(
+        `O período não pode passar de ${LIMITE_DIAS_PERIODO} dias. Ajuste as datas e tente novamente.`,
+      );
+      return;
+    }
     setBaixando(tipo);
     try {
       const nome = await baixarRelatorio(tipo, {
@@ -125,10 +153,14 @@ export function ReportsPage() {
           size="small"
           value={ate}
           onChange={(e) => setPeriodo((p) => ({ ...p, ate: e.target.value }))}
-          slotProps={{ inputLabel: { shrink: true } }}
+          slotProps={{
+            inputLabel: { shrink: true },
+            htmlInput: { max: ateMaximo(de) },
+          }}
         />
         <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'center' }}>
-          O período vale para todos os relatórios (padrão: mês corrente).
+          O período vale para todos os relatórios (padrão: mês corrente; máximo de{' '}
+          {LIMITE_DIAS_PERIODO} dias).
         </Typography>
       </Paper>
 
