@@ -37,10 +37,11 @@ import {
   Typography,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import { useState, type ReactElement } from 'react';
+import { Suspense, useState, type ReactElement } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import type { Role } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
+import { CarregandoPagina } from '../components/CarregandoPagina';
 import { ChangePasswordDialog } from '../components/ChangePasswordDialog';
 import { BuscaRapida } from './BuscaRapida';
 import { NotificacoesMenu } from './NotificacoesMenu';
@@ -369,7 +370,9 @@ export function AppLayout() {
 
       <Box component="main" sx={{ flexGrow: 1, p: 3, minWidth: 0 }}>
         <Toolbar />
-        <Outlet />
+        <Suspense fallback={<CarregandoPagina />}>
+          <Outlet />
+        </Suspense>
       </Box>
 
       <ChangePasswordDialog

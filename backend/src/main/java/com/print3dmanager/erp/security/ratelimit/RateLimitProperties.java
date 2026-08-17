@@ -4,7 +4,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * Limites de requisições por IP nas rotas abertas
- * (chave application.rate-limit.*). Janela fixa em segundos.
+ * (chave application.rate-limit.*). Janela deslizante em segundos.
  */
 @ConfigurationProperties(prefix = "application.rate-limit")
 public record RateLimitProperties(

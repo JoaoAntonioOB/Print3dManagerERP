@@ -19,9 +19,20 @@ function CartaoAcao({ titulo, quantidade, descricao, icone, cor, rota }: CardAca
   const navigate = useNavigate();
   const ativo = quantidade > 0;
 
+  const irParaRota = () => navigate(rota);
+
   return (
     <Paper
-      onClick={() => navigate(rota)}
+      onClick={irParaRota}
+      role="button"
+      tabIndex={0}
+      aria-label={`${quantidade} ${titulo} — ${descricao}`}
+      onKeyDown={(evento) => {
+        if (evento.key === 'Enter' || evento.key === ' ') {
+          evento.preventDefault();
+          irParaRota();
+        }
+      }}
       sx={{
         p: 2,
         display: 'flex',
@@ -32,6 +43,10 @@ function CartaoAcao({ titulo, quantidade, descricao, icone, cor, rota }: CardAca
         borderColor: ativo ? cor : 'divider',
         transition: 'border-color 0.15s, background-color 0.15s',
         '&:hover': { bgcolor: 'action.hover' },
+        '&:focus-visible': {
+          outline: (t) => `2px solid ${t.palette.primary.main}`,
+          outlineOffset: 2,
+        },
       }}
     >
       <Box

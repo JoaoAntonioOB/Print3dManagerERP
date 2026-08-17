@@ -20,7 +20,7 @@ public record UserCreateRequest(
         String email,
 
         @NotBlank(message = "A senha é obrigatória")
-        @Size(min = 6, max = 100, message = "A senha deve ter entre 6 e 100 caracteres")
+        @Size(min = 8, max = 100, message = "A senha deve ter entre 8 e 100 caracteres")
         String senha,
 
         @NotNull(message = "O papel (role) é obrigatório")

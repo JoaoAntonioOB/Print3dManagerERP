@@ -57,4 +57,18 @@ public class OrderItem extends BaseEntity {
     public BigDecimal getSubtotal() {
         return precoUnitario.multiply(BigDecimal.valueOf(quantidade));
     }
+
+    /**
+     * Nome de exibição do arquivo de modelo — sem o subdiretório de
+     * armazenamento nem o prefixo UUID anti-colisão de {@link #arquivoModelo}
+     * (detalhe interno do storage, nunca exposto ao cliente da API).
+     */
+    public String getNomeArquivoModelo() {
+        if (arquivoModelo == null) {
+            return null;
+        }
+        String nome = arquivoModelo.substring(arquivoModelo.lastIndexOf('/') + 1);
+        int separador = nome.indexOf('_');
+        return separador < 0 ? nome : nome.substring(separador + 1);
+    }
 }

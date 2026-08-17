@@ -13,7 +13,9 @@ import org.mapstruct.MappingTarget;
 /**
  * Conversões entidade ↔ DTO de pedidos e itens. O filamento dos itens é
  * resolvido no service (o request traz só o id); id/pedido/arquivoModelo
- * nunca vêm do request.
+ * nunca vêm do request. {@code OrderItemResponse.arquivoModelo} expõe o
+ * nome de exibição do arquivo ({@link OrderItem#getNomeArquivoModelo()}) —
+ * nunca o caminho interno de armazenamento.
  */
 @Mapper
 public interface OrderMapper {
@@ -30,6 +32,7 @@ public interface OrderMapper {
 
     @Mapping(target = "filamentoId", source = "filamento.id")
     @Mapping(target = "filamentoNome", source = "filamento.nome")
+    @Mapping(target = "arquivoModelo", source = "nomeArquivoModelo")
     OrderItemResponse toItemResponse(OrderItem item);
 
     @Mapping(target = "id", ignore = true)

@@ -91,7 +91,7 @@ public class OrderItemFileService {
                     "O arquivo de modelo do item %d não foi encontrado no armazenamento."
                             .formatted(itemId));
         }
-        String nomeDownload = nomeParaDownload(item.getArquivoModelo());
+        String nomeDownload = item.getNomeArquivoModelo();
         return new ModelFileDownload(
                 new FileSystemResource(caminho),
                 nomeDownload,
@@ -165,13 +165,6 @@ public class OrderItemFileService {
     private String extensaoDe(String nome) {
         int ponto = nome.lastIndexOf('.');
         return ponto < 0 ? "" : nome.substring(ponto + 1).toLowerCase();
-    }
-
-    /** Nome de download: o que vem depois do prefixo UUID do nome armazenado. */
-    private String nomeParaDownload(String arquivoModelo) {
-        String nome = arquivoModelo.substring(arquivoModelo.lastIndexOf('/') + 1);
-        int separador = nome.indexOf('_');
-        return separador < 0 ? nome : nome.substring(separador + 1);
     }
 
     /** Resolve o caminho relativo dentro da raiz de uploads (barra path traversal). */

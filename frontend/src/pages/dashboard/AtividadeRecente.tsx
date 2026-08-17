@@ -33,8 +33,7 @@ export function AtividadeRecente() {
 
   const { data: clientes, isPending: carregandoClientes } = useQuery({
     queryKey: ['clients', 'atividade-recente'],
-    // A API só ordena por nome — os mais recentes são achados no cliente.
-    queryFn: () => clientsApi.listar({ page: 0, size: 20, ativo: true }),
+    queryFn: () => clientsApi.listar({ page: 0, size: 3, ativo: true, sort: 'criadoEm,desc' }),
   });
 
   const carregando = carregandoPedidos || carregandoClientes;
@@ -47,16 +46,13 @@ export function AtividadeRecente() {
       icone: <ReceiptLongIcon fontSize="small" />,
       cor: '#3987e5',
     })),
-    ...[...(clientes?.content ?? [])]
-      .sort((a, b) => b.criadoEm.localeCompare(a.criadoEm))
-      .slice(0, 3)
-      .map((c) => ({
-        chave: `cliente-${c.id}`,
-        texto: `Novo cliente cadastrado: ${c.nome}`,
-        criadoEm: c.criadoEm,
-        icone: <GroupAddIcon fontSize="small" />,
-        cor: '#199e70',
-      })),
+    ...(clientes?.content ?? []).map((c) => ({
+      chave: `cliente-${c.id}`,
+      texto: `Novo cliente cadastrado: ${c.nome}`,
+      criadoEm: c.criadoEm,
+      icone: <GroupAddIcon fontSize="small" />,
+      cor: '#199e70',
+    })),
   ]
     .sort((a, b) => b.criadoEm.localeCompare(a.criadoEm))
     .slice(0, 6);

@@ -49,14 +49,46 @@ class RateLimitServiceTest {
     }
 
     @Test
-    @DisplayName("janela expirada zera a contagem")
-    void janelaExpiradaReseta() {
+    @DisplayName("depois de mais de duas janelas sem atividade a contagem anterior deixa de pesar")
+    void janelaMuitoAntigaNaoPesa() {
         for (int i = 0; i < 4; i++) {
             service.permitir("auth:1.1.1.1", 3, 60);
         }
-        relogio.avancarSegundos(61);
+        relogio.avancarSegundos(181);
 
         assertThat(service.permitir("auth:1.1.1.1", 3, 60)).isTrue();
+    }
+
+    @Test
+    @DisplayName("rajada na fronteira entre janelas é bloqueada pela ponderação da janela anterior")
+    void rajadaNaFronteiraEBloqueada() {
+        // 3 requisições no fim de uma janela de 60s (limite cheio).
+        for (int i = 0; i < 3; i++) {
+            assertThat(service.permitir("auth:1.1.1.1", 3, 60)).isTrue();
+        }
+        // Avança 61s: já é a janela seguinte (que começou 1s atrás). Numa
+        // janela fixa "pura" isso liberaria mais 3 requisições imediatamente
+        // (rajada de até 2× o limite numa janela deslizante real de 60s
+        // centrada na fronteira); com a ponderação da janela anterior, a
+        // estimativa ainda reflete quase toda a contagem anterior e bloqueia.
+        relogio.avancarSegundos(61);
+
+        assertThat(service.permitir("auth:1.1.1.1", 3, 60)).isFalse();
+    }
+
+    @Test
+    @DisplayName("no meio da nova janela o peso da anterior já caiu e libera requisições parciais")
+    void meioDaJanelaLiberaParcialmente() {
+        for (int i = 0; i < 3; i++) {
+            service.permitir("auth:1.1.1.1", 3, 60);
+        }
+        // Metade da janela seguinte já passou: peso da anterior cai para ~0.5
+        // (3 * 0.5 = 1.5), então uma única requisição nova (estimativa ~2.5)
+        // ainda cabe no limite de 3, mas uma segunda (~3.5) não.
+        relogio.avancarSegundos(90);
+
+        assertThat(service.permitir("auth:1.1.1.1", 3, 60)).isTrue();
+        assertThat(service.permitir("auth:1.1.1.1", 3, 60)).isFalse();
     }
 
     @Test

@@ -18,8 +18,9 @@ public record OrderItemResponse(
         BigDecimal precoUnitario,
         @Schema(description = "Quantidade × preço unitário")
         BigDecimal subtotal,
-        @Schema(description = "Caminho do arquivo STL/3MF no armazenamento; anexado via "
-                + "POST /orders/{pedidoId}/itens/{itemId}/arquivo")
+        @Schema(description = "Nome original do arquivo de modelo STL/3MF anexado (sem o "
+                + "caminho interno de armazenamento); anexado via "
+                + "POST /orders/{pedidoId}/itens/{itemId}/arquivo, null quando não há anexo")
         String arquivoModelo,
         Instant criadoEm,
         Instant atualizadoEm

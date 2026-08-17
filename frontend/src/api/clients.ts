@@ -43,6 +43,8 @@ export interface FiltrosClientes {
   ativo?: boolean | '';
   page: number;
   size: number;
+  /** Ex.: 'criadoEm,desc'. Padrão do endpoint é 'nome,asc'. */
+  sort?: string;
 }
 
 export const clientsApi = {
@@ -54,7 +56,7 @@ export const clientsApi = {
         ativo: filtros.ativo === '' ? undefined : filtros.ativo,
         page: filtros.page,
         size: filtros.size,
-        sort: 'nome,asc',
+        sort: filtros.sort || 'nome,asc',
       },
     });
     return data;

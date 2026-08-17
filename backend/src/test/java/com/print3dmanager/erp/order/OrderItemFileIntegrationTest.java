@@ -51,7 +51,8 @@ class OrderItemFileIntegrationTest extends AbstractApiIntegrationTest {
                                 .header(HttpHeaders.AUTHORIZATION, bearer(admin)))
                 .andExpect(status().isOk())
                 .andReturn());
-        assertThat(itemComArquivo.get("arquivoModelo").asText()).startsWith("modelos/");
+        // o DTO expõe o nome original de exibição, não o caminho interno de armazenamento
+        assertThat(itemComArquivo.get("arquivoModelo").asText()).isEqualTo("Suporte_Parede.stl");
 
         // baixar: conteúdo idêntico, nome sanitizado no Content-Disposition
         MvcResult download = mockMvc.perform(
