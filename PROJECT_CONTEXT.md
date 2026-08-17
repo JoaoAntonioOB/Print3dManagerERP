@@ -335,6 +335,7 @@ O módulo `user/` define o padrão que TODOS os próximos módulos devem seguir:
 6. Segredo JWT tem **default de dev** no yml/compose (base64) — em produção deve vir do `.env` (`openssl rand -base64 48`).
 7. **`mvnw test` roda a suíte completa (78 testes)** — os de integração exigem o Docker Desktop em execução (Testcontainers baixa `postgres:16-alpine` e `testcontainers/ryuk` na primeira vez). A pinagem `api.version=1.44` no Surefire cobre o Docker Engine 29+.
 8. Máquina: Windows 11, PowerShell 5.1. O terminal do usuário usa pt-BR.
+9. **CI no GitHub Actions** (`.github/workflows/ci.yml`, achado BAIXO #26 da auditoria de 9 domínios): roda em `push`/`pull_request` para `main`. Três jobs em paralelo — `backend-test` (`mvnw test`, sem `services:` porque o Testcontainers já gerencia seu próprio container Postgres e o runner `ubuntu-latest` já tem Docker), `backend-dependency-check` (OWASP `dependency-check-maven`, derruba o build em CVSS ≥ 7; cache do banco NVD entre execuções; aceita secret opcional `NVD_API_KEY` do repositório para acelerar a sincronização) e `frontend` (`npm ci` → `lint` → `build` → `npm audit --audit-level=high`).
 
 ---
 
